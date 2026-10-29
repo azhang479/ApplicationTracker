@@ -198,7 +198,7 @@ class SetupTests(unittest.TestCase):
         self.run_setup(oauth=True)
         self.assertEqual(self.state()['secrets'][OAUTH], ['test-only-oauth-secret'])
         self.assertGreaterEqual(len(self.state()['secrets'][KEY][0]), 24)
-        self.assertEqual(self.state()['env']['GEMINI_MODEL'], 'gemini-3-flash-preview')
+        self.assertEqual(self.state()['env']['GEMINI_MODEL'], 'gemini-3.5-flash-lite')
         self.assertEqual(self.state()['env']['GEMINI_LOCATION'], 'global')
         self.assertEqual(self.state()['env']['GCP_LOCATION'], 'us-central1')
 

@@ -4,7 +4,7 @@ set -euo pipefail
 : "${PROJECT_ID:?Set PROJECT_ID to your billing-enabled Google Cloud project ID}"
 : "${OWNER_EMAIL:?Set OWNER_EMAIL to your personal Gmail address}"
 REGION="${REGION:-us-central1}"
-GEMINI_MODEL="${GEMINI_MODEL:-gemini-3-flash-preview}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.5-flash-lite}"
 GEMINI_LOCATION="${GEMINI_LOCATION:-global}"
 OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID:-}"
 OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-}"

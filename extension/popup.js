@@ -1,5 +1,7 @@
 import { settings, salary } from './shared.js';
 
+const JOB_TEXT_LIMIT = 20_000;
+
 const track = document.getElementById('track');
 const message = document.getElementById('message');
 function showError(error) {
@@ -18,10 +20,11 @@ track.addEventListener('click', async () => {
       throw new Error('Open a job posting on a regular web page first.');
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: () => ({
+      args: [JOB_TEXT_LIMIT],
+      func: (limit) => ({
         url: location.href,
         pageTitle: document.title,
-        text: document.body.innerText.slice(0, 40000),
+        text: document.body.innerText.slice(0, limit),
       }),
     });
     if (!injection?.result)

@@ -4,6 +4,8 @@ import { AI, Email, Store, passesPrefilter } from './domain.js';
 import { Config } from './config.js';
 import { Tracker } from './service.js';
 
+const EMAIL_TEXT_LIMIT = 6_000;
+
 export function parseMime(part: gmail_v1.Schema$MessagePart): string {
   const plain: string[] = [];
   const html: string[] = [];
@@ -169,7 +171,11 @@ export class GmailService {
       };
       if (passesPrefilter(email.subject + ' ' + text)) {
         const result = await this.ai.classify(
-          JSON.stringify({ subject: email.subject, from: email.from, text: text.slice(0, 40000) }),
+          JSON.stringify({
+            subject: email.subject,
+            from: email.from,
+            text: text.slice(0, EMAIL_TEXT_LIMIT),
+          }),
         );
         if (result.isJobRelated) {
           await this.store.exclusive(async () => {

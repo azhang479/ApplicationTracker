@@ -4,7 +4,7 @@ const schema = z.object({
   GOOGLE_CLOUD_PROJECT: z.string().min(1),
   GCP_LOCATION: z.string().default('us-central1'),
   GEMINI_LOCATION: z.string().default('global'),
-  GEMINI_MODEL: z.string().default('gemini-3-flash-preview'),
+  GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'),
   OWNER_EMAIL: z.string().email(),
   OAUTH_CLIENT_ID: z.string().min(1),
   OAUTH_CLIENT_SECRET: z.string().min(1),

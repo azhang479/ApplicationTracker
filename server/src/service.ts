@@ -14,6 +14,8 @@ import {
   statuses,
 } from './domain.js';
 
+const JOB_TEXT_LIMIT = 20_000;
+
 export const patchSchema = jobSchema
   .partial()
   .extend({
@@ -51,7 +53,7 @@ export class Tracker {
     const known = (await this.store.listApplications()).find((app) => app.url === input.url);
     if (known) return { ...known, duplicate: true };
     const fields = jobSchema.parse(
-      await this.ai.extract({ ...input, text: input.text.slice(0, 40000) }),
+      await this.ai.extract({ ...input, text: input.text.slice(0, JOB_TEXT_LIMIT) }),
     );
     fields.url = input.url;
     return this.store.exclusive(async () => {

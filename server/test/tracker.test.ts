@@ -102,8 +102,16 @@ describe('capture', () => {
     const app = await tracker.capture({ url: job.url, pageTitle: '', text: 'a'.repeat(50000) });
     expect(app.status).toBe('Applied');
     expect(app.events[0].type).toBe('applied');
-    expect(vi.mocked(ai.extract).mock.calls[0][0].text.length).toBe(40000);
+    expect(vi.mocked(ai.extract).mock.calls[0][0].text.length).toBe(20000);
   });
+  it.each([0, 100, 19999, 20000, 20001])(
+    'caps a %s-character posting without changing shorter input',
+    async (length) => {
+      const { tracker, ai } = setup();
+      await tracker.capture({ url: job.url, pageTitle: job.title, text: 'a'.repeat(length) });
+      expect(vi.mocked(ai.extract).mock.calls[0][0].text).toBe('a'.repeat(Math.min(length, 20000)));
+    },
+  );
   it('deduplicates URL and normalized company/jobId', async () => {
     const { tracker, capture, store } = setup();
     await capture();

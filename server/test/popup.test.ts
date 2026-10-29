@@ -6,6 +6,7 @@ afterEach(() => {
 });
 async function openPopup(
   response: { status: number; ok?: boolean; json?: () => Promise<unknown> } | Error,
+  pageText = 'Page',
 ) {
   const elements = new Map<
     string,
@@ -36,16 +37,25 @@ async function openPopup(
       addEventListener: vi.fn(),
     });
   }
-  vi.stubGlobal('document', { getElementById: (id: string) => elements.get(id) });
+  vi.stubGlobal('document', {
+    getElementById: (id: string) => elements.get(id),
+    title: 'Engineer',
+    body: { innerText: pageText },
+  });
+  vi.stubGlobal('location', { href: 'https://example.com/job' });
   vi.stubGlobal('chrome', {
     storage: {
       sync: { get: async () => ({ backendUrl: 'http://localhost:8080', apiKey: 'test-key' }) },
     },
     tabs: { query: async () => [{ id: 1, url: 'https://example.com/job' }] },
     scripting: {
-      executeScript: async () => [
-        { result: { url: 'https://example.com/job', pageTitle: 'Engineer', text: 'Page' } },
-      ],
+      executeScript: async ({
+        func,
+        args,
+      }: {
+        func: (limit: number) => unknown;
+        args: number[];
+      }) => [{ result: func(args[0]) }],
     },
   });
   const fetch = vi.fn();
@@ -58,6 +68,21 @@ async function openPopup(
   return elements;
 }
 describe('extension capture feedback', () => {
+  it.each([0, 19999, 20000, 20001, 40000])(
+    'caps a %s-character page before sending it',
+    async (length) => {
+      await openPopup(
+        { status: 200, ok: true, json: async () => ({ company: 'Acme' }) },
+        'x'.repeat(length),
+      );
+      const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1]!.body as string);
+      expect(body).toEqual({
+        url: 'https://example.com/job',
+        pageTitle: 'Engineer',
+        text: 'x'.repeat(Math.min(length, 20000)),
+      });
+    },
+  );
   it.each([
     [401, "API key doesn't match. Check Settings."],
     [400, "Couldn't read this job page."],

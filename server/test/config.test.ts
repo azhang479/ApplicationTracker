@@ -23,7 +23,7 @@ describe('Gemini configuration', () => {
     const config = loadConfig();
     expect(config.GCP_LOCATION).toBe('us-central1');
     expect(config.GEMINI_LOCATION).toBe('global');
-    expect(config.GEMINI_MODEL).toBe('gemini-3-flash-preview');
+    expect(config.GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
   });
   it('allows independent model and location overrides', () => {
     vi.stubEnv('GCP_LOCATION', 'us-east1');

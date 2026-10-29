@@ -21,8 +21,9 @@ You need:
   `gcloud auth login`. You do not need service-account key files or local ADC login.
 
 Billing is required even when usage fits free tiers. Expect infrastructure costs
-of about $0/month at light personal usage, but **not a guaranteed $0 bill**: Gemini
-on Vertex AI is usage-billed. Read the [cost section](#costs-and-limits) before starting.
+of about $0/month at light personal usage, plus roughly **$1–3/month for Gemini**
+on Vertex AI. These are estimates, not spending caps. Read the
+[cost section](#costs-and-limits) before starting.
 
 Clone the project in your terminal (if you already have a clone, use that folder):
 
@@ -47,12 +48,12 @@ Confirm the active account is allowed to administer that project. Choose REGION
 before the first run: a Firestore database's location cannot be changed later.
 `us-central1` is the tested default; other regions must support Cloud Run, Firestore,
 Cloud Scheduler. Gemini uses a separate location, `global`, so it does not depend
-on your database or Cloud Run region. The default model is `gemini-3-flash-preview`.
+on your database or Cloud Run region. The default model is `gemini-3.5-flash-lite`.
 To use another available model or endpoint, set these optional variables before
 running `infra/setup.sh` (including on redeployments):
 
 ```bash
-export GEMINI_MODEL='gemini-3-flash-preview'
+export GEMINI_MODEL='gemini-3.5-flash-lite'
 export GEMINI_LOCATION='global'
 ```
 
@@ -368,16 +369,17 @@ its card in `chrome://extensions`.
   Pub/Sub, one Scheduler job, Secret Manager, and build usage can fit free tiers:
   **about $0/month for infrastructure** is a reasonable target, not a promise.
   Free quotas may be shared with other projects on your billing account.
-- **Vertex Gemini Flash is metered** for input/output tokens on Vertex AI. Even
-  personal use can create a small nonzero bill, and heavy capture/email traffic
+- **Vertex Gemini Flash Lite is metered** for input/output tokens on Vertex AI.
+  Budget roughly **$1–3/month** for light personal use; heavy capture/email traffic
   costs more. This is not the consumer Gemini or AI Studio free tier. Each capture
-  can send up to about 40,000 characters; relevant new mail also uses Gemini.
+  sends at most 20,000 job-page characters; relevant new mail sends at most 6,000
+  email-body characters, plus its subject and sender.
 - Source builds store images in **Artifact Registry → cloud-run-source-deploy**.
   Repeated deployments can accumulate billable storage. Remove old unused images
   or configure a cleanup policy there; do not delete the currently deployed image.
   Logs and additional active secret versions can also exceed free allocations.
 - The script caps Cloud Run at two instances, but this is not a cost cap and does
-  not cap Vertex tokens. It uses the default Flash model and 45-day ghosting period.
+  not cap Vertex tokens. It uses the default Flash Lite model and 45-day ghosting period.
   If you change those settings manually, a later setup run restores those defaults.
 - This is a personal tracker, not a high-volume service. Firestore transactions
   read the small application/review collections; matching prefers an exact job ID,
@@ -392,6 +394,19 @@ Check current prices for [Cloud Run](https://cloud.google.com/run/pricing),
 [Cloud Build](https://cloud.google.com/build/pricing),
 [Artifact Registry](https://cloud.google.com/artifact-registry/pricing), and
 [Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/pricing).
+
+To switch models without rebuilding, replace the model name below with another
+model available to your project on `global`, then run:
+
+```bash
+gcloud run services update application-tracker \
+  --project="$PROJECT_ID" --region="$REGION" \
+  --update-env-vars=GEMINI_MODEL=gemini-3.5-flash-lite
+```
+
+This changes only the model setting and keeps `GEMINI_LOCATION=global`. Export
+the same `GEMINI_MODEL` before future `bash infra/setup.sh` runs, or setup will
+restore its default model.
 
 To stop permanently, disconnect this app in your Google Account's third-party
 connections, then remove its Scheduler job, push subscription, and Cloud Run service.
