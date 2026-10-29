@@ -7,7 +7,10 @@ import type { Tracker } from '../src/service.js';
 
 vi.mock('googleapis/build/src/apis/gmail/index.js', () => ({ gmail: vi.fn() }));
 
-function setup(config: GmailConfig = { refreshToken: 'fake', historyId: '100' }) {
+function setup(
+  config: GmailConfig = { refreshToken: 'fake', historyId: '100' },
+  ownerEmail = 'owner@gmail.com',
+) {
   let saved = { ...config };
   const history = vi.fn().mockResolvedValue({ data: { historyId: '200', history: [] } });
   const list = vi.fn().mockResolvedValue({ data: { messages: [] } });
@@ -27,7 +30,7 @@ function setup(config: GmailConfig = { refreshToken: 'fake', historyId: '100' })
   const classify = vi.fn().mockResolvedValue({ isJobRelated: false });
   const service = new GmailService(
     {
-      OWNER_EMAIL: 'owner@gmail.com',
+      OWNER_EMAIL: ownerEmail,
       OAUTH_CLIENT_ID: 'client',
       OAUTH_CLIENT_SECRET: 'secret',
       PUBLIC_URL: 'https://example.test',
@@ -98,6 +101,17 @@ describe('Gmail sync cursor', () => {
     await ctx.service.processNotification({ ...notification, emailAddress: 'someone@gmail.com' });
     expect(ctx.saveGmail).not.toHaveBeenCalled();
     expect(ctx.history).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['OWNER@GMAIL.COM', 'owner@gmail.com'],
+    ['owner@gmail.com', 'OWNER@GMAIL.COM'],
+    ['Owner@Gmail.com', 'oWNER@gMAIL.COM'],
+  ])('processes mailbox %s for owner %s regardless of case', async (emailAddress, ownerEmail) => {
+    const ctx = setup(undefined, ownerEmail);
+    await ctx.service.processNotification({ ...notification, emailAddress });
+    expect(ctx.history).toHaveBeenCalledOnce();
+    expect(ctx.saveGmail).toHaveBeenCalledOnce();
+    expect(ctx.saved().historyId).toBe('200');
   });
 });
 

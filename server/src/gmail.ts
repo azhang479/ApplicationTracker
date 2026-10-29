@@ -95,7 +95,7 @@ export class GmailService {
     await this.renew();
   }
   async processNotification(notification: { emailAddress: string; historyId: string }) {
-    if (notification.emailAddress !== this.config.OWNER_EMAIL) return;
+    if (notification.emailAddress.toLowerCase() !== this.config.OWNER_EMAIL.toLowerCase()) return;
     const config = await this.store.getGmail();
     if (!config) return;
     const syncedAt = new Date().toISOString();
