@@ -1,7 +1,33 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { z } from 'zod';
 import { AI, classificationSchema, jobSchema } from './domain.js';
 
 const string = { type: Type.STRING };
+const salary = z.preprocess((value) => {
+  if (typeof value === 'string') {
+    if (!value.trim()) return null;
+    return Number(value);
+  }
+  return value;
+}, z.number().nonnegative().nullable().catch(null));
+const extractedJob = jobSchema.omit({ url: true }).extend({
+  company: z.string().trim().min(1).catch('Unknown company'),
+  title: z.string().trim().catch(''),
+  jobId: z.string().catch(''),
+  location: z.string().catch(''),
+  workMode: jobSchema.shape.workMode.catch('unknown'),
+  salaryMin: salary,
+  salaryMax: salary,
+  salaryCurrency: z.string().trim().min(1).catch('USD'),
+  salaryPeriod: jobSchema.shape.salaryPeriod.catch('year'),
+  salaryIsEstimated: z.preprocess((value) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  }, z.boolean().catch(false)),
+  jobSummary: z.string().catch(''),
+  keyRequirements: z.array(z.string()).catch([]),
+});
 export class VertexAI implements AI {
   private client: GoogleGenAI;
   constructor(
@@ -25,7 +51,7 @@ export class VertexAI implements AI {
     return JSON.parse(response.text || '{}');
   }
   async extract(input: { url: string; pageTitle: string; text: string }) {
-    return jobSchema.parse(
+    const fields = extractedJob.parse(
       await this.generate(
         'Extract this job posting. If no salary is posted, estimate from title, level and location and set salaryIsEstimated=true. Use empty strings for missing jobId/location. Return concise summary and requirements.',
         JSON.stringify(input),
@@ -33,7 +59,6 @@ export class VertexAI implements AI {
           company: string,
           title: string,
           jobId: string,
-          url: string,
           location: string,
           workMode: { ...string, enum: ['remote', 'hybrid', 'onsite', 'unknown'] },
           salaryMin: { type: Type.NUMBER, nullable: true },
@@ -46,6 +71,11 @@ export class VertexAI implements AI {
         },
       ),
     );
+    return jobSchema.parse({
+      ...fields,
+      url: input.url,
+      title: fields.title || input.pageTitle.trim() || 'Untitled job',
+    });
   }
   async classify(text: string) {
     return classificationSchema.parse(

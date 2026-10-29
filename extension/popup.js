@@ -1,5 +1,7 @@
 import { settings, salary } from './shared.js';
 
+const JOB_TEXT_LIMIT = 20_000;
+
 const track = document.getElementById('track');
 const message = document.getElementById('message');
 function showError(error) {
@@ -18,21 +20,29 @@ track.addEventListener('click', async () => {
       throw new Error('Open a job posting on a regular web page first.');
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: () => ({
+      args: [JOB_TEXT_LIMIT],
+      func: (limit) => ({
         url: location.href,
         pageTitle: document.title,
-        text: document.body.innerText.slice(0, 40000),
+        text: document.body.innerText.slice(0, limit),
       }),
     });
     if (!injection?.result)
       throw new Error('This page could not be read. Try another job posting.');
-    const response = await fetch(config.url + '/api/capture', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': config.apiKey },
-      body: JSON.stringify(injection.result),
-      signal: AbortSignal.timeout(90000),
-    });
-    if (response.status === 401) throw new Error('Your API key was not accepted. Check Settings.');
+    let response;
+    try {
+      response = await fetch(config.url + '/api/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': config.apiKey },
+        body: JSON.stringify(injection.result),
+        signal: AbortSignal.timeout(90000),
+      });
+    } catch {
+      throw new Error("Can't reach the server. Check the backend URL in Settings.");
+    }
+    if (response.status === 401) throw new Error("API key doesn't match. Check Settings.");
+    if (response.status === 400) throw new Error("Couldn't read this job page.");
+    if (response.status >= 500) throw new Error('Server error. Try again.');
     if (!response.ok) throw new Error('The job could not be saved. Please try again in a moment.');
     const job = await response.json();
     message.textContent = '';

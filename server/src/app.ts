@@ -1,10 +1,11 @@
-import express, { ErrorRequestHandler, RequestHandler } from 'express';
+import express, { ErrorRequestHandler, RequestHandler, Request } from 'express';
 import { resolve } from 'node:path';
 import { z, ZodError } from 'zod';
 import { Config } from './config.js';
 import { TokenVerifier, auth, sameSecret, signState, validState } from './auth.js';
 import { Tracker, NotFound, patchSchema, resolveSchema } from './service.js';
 import { GmailService } from './gmail.js';
+import { logError } from './logging.js';
 
 const wrap =
   (handler: RequestHandler): RequestHandler =>
@@ -18,6 +19,15 @@ export function createApp(
   verifier: TokenVerifier,
 ) {
   const app = express();
+  function report(error: unknown, context: string, req: Request) {
+    logError(error, context, [
+      config.EXTENSION_API_KEY,
+      config.OAUTH_CLIENT_SECRET,
+      req.get('X-API-Key') || '',
+      req.get('Authorization') || '',
+      typeof req.body?.text === 'string' ? req.body.text : '',
+    ]);
+  }
   app.disable('x-powered-by');
   app.use(express.json({ limit: '1mb' }));
   app.get('/health', (_req, res) => {
@@ -124,6 +134,7 @@ export function createApp(
     wrap(async (req, res) => {
       const envelope = z.object({ message: z.object({ data: z.string() }) }).safeParse(req.body);
       if (!envelope.success) {
+        report(envelope.error, 'Invalid Gmail notification envelope', req);
         res.sendStatus(204);
         return;
       }
@@ -132,7 +143,8 @@ export function createApp(
         notification = z
           .object({ emailAddress: z.string(), historyId: z.string() })
           .parse(JSON.parse(Buffer.from(envelope.data.message.data, 'base64').toString()));
-      } catch {
+      } catch (error) {
+        report(error, 'Invalid Gmail notification', req);
         res.sendStatus(204);
         return;
       }
@@ -141,7 +153,7 @@ export function createApp(
       } catch (error) {
         const code = Number((error as { code?: number }).code);
         if ([400, 401, 403, 404].includes(code)) {
-          console.error('Gmail notification requires owner attention:', code);
+          report(error, 'Gmail notification requires owner attention (' + code + ')', req);
           res.sendStatus(204);
           return;
         }
@@ -166,7 +178,8 @@ export function createApp(
   app.get('*', (_req, res) => {
     res.sendFile(resolve(web, 'index.html'));
   });
-  const errors: ErrorRequestHandler = (error, _req, res, _next) => {
+  const errors: ErrorRequestHandler = (error, req, res, _next) => {
+    report(error, 'Request failed', req);
     if (error instanceof ZodError || error instanceof SyntaxError) {
       res.status(400).json({ error: 'Invalid request' });
       return;
@@ -175,7 +188,6 @@ export function createApp(
       res.sendStatus(404);
       return;
     }
-    console.error('Request failed:', error instanceof Error ? error.name : 'unknown');
     res.status(503).json({ error: 'Service temporarily unavailable' });
   };
   app.use(errors);

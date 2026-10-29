@@ -22,7 +22,9 @@ function setup(config: GmailConfig = { refreshToken: 'fake', historyId: '100' })
     getGmail: async () => saved,
     saveGmail,
     isProcessed: vi.fn(async () => true),
+    markProcessed: vi.fn(),
   } as unknown as Store;
+  const classify = vi.fn().mockResolvedValue({ isJobRelated: false });
   const service = new GmailService(
     {
       OWNER_EMAIL: 'owner@gmail.com',
@@ -31,10 +33,10 @@ function setup(config: GmailConfig = { refreshToken: 'fake', historyId: '100' })
       PUBLIC_URL: 'https://example.test',
     } as Config,
     store,
-    {} as AI,
+    { classify } as unknown as AI,
     {} as Tracker,
   );
-  return { service, history, list, get, saveGmail, saved: () => saved };
+  return { service, history, list, get, store, classify, saveGmail, saved: () => saved };
 }
 const notification = { emailAddress: 'owner@gmail.com', historyId: '200' };
 beforeEach(() => vi.clearAllMocks());
@@ -96,5 +98,50 @@ describe('Gmail sync cursor', () => {
     await ctx.service.processNotification({ ...notification, emailAddress: 'someone@gmail.com' });
     expect(ctx.saveGmail).not.toHaveBeenCalled();
     expect(ctx.history).not.toHaveBeenCalled();
+  });
+});
+
+describe('email classification text limit', () => {
+  function pendingEmail(text: string) {
+    const ctx = setup();
+    vi.mocked(ctx.store.isProcessed).mockResolvedValue(false);
+    ctx.history.mockResolvedValue({
+      data: { historyId: '200', history: [{ messagesAdded: [{ message: { id: 'new-mail' } }] }] },
+    });
+    ctx.get.mockResolvedValue({
+      data: {
+        payload: {
+          mimeType: 'text/plain',
+          headers: [
+            { name: 'Subject', value: 'Application update' },
+            { name: 'From', value: 'jobs@example.com' },
+          ],
+          body: { data: Buffer.from(text).toString('base64url') },
+        },
+      },
+    });
+    return ctx;
+  }
+  it.each([0, 100, 5999, 6000, 6001, 40000])(
+    'caps a %s-character email body while retaining headers',
+    async (length) => {
+      const ctx = pendingEmail('x'.repeat(length));
+      await ctx.service.processNotification(notification);
+      expect(JSON.parse(ctx.classify.mock.calls[0][0])).toEqual({
+        subject: 'Application update',
+        from: 'jobs@example.com',
+        text: 'x'.repeat(Math.min(length, 6000)),
+      });
+      expect(ctx.store.markProcessed).toHaveBeenCalledWith('new-mail');
+    },
+  );
+  it('does not mark email processed or advance the cursor when classification fails', async () => {
+    const ctx = pendingEmail('x'.repeat(10000));
+    ctx.classify.mockRejectedValue(new Error('Gemini unavailable'));
+    await expect(ctx.service.processNotification(notification)).rejects.toThrow(
+      'Gemini unavailable',
+    );
+    expect(ctx.store.markProcessed).not.toHaveBeenCalled();
+    expect(ctx.saveGmail).not.toHaveBeenCalled();
   });
 });

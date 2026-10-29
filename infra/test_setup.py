@@ -134,7 +134,7 @@ class SetupTests(unittest.TestCase):
         (directory / 'gcloud').symlink_to(Path(__file__).resolve())
         self.path = directory / 'state.json'
         self.path.write_text(json.dumps({'calls': [], 'accounts': [], 'secrets': {}, 'env': {}}))
-        self.env = {k: v for k, v in os.environ.items() if not k.startswith('OAUTH_')}
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith(('OAUTH_', 'GEMINI_'))}
         self.env.update(PATH=str(directory) + os.pathsep + self.env['PATH'],
                         FAKE_STATE=str(self.path), PROJECT_ID='demo-project',
                         OWNER_EMAIL='owner@gmail.com', REGION='us-central1')
@@ -198,6 +198,20 @@ class SetupTests(unittest.TestCase):
         self.run_setup(oauth=True)
         self.assertEqual(self.state()['secrets'][OAUTH], ['test-only-oauth-secret'])
         self.assertGreaterEqual(len(self.state()['secrets'][KEY][0]), 24)
+        self.assertEqual(self.state()['env']['GEMINI_MODEL'], 'gemini-3.5-flash-lite')
+        self.assertEqual(self.state()['env']['GEMINI_LOCATION'], 'global')
+        self.assertEqual(self.state()['env']['GCP_LOCATION'], 'us-central1')
+
+    def test_gemini_overrides_are_independent_of_resource_region(self):
+        self.run_setup(GEMINI_MODEL='custom-flash', GEMINI_LOCATION='europe-west4')
+        self.assertEqual(self.state()['env']['GEMINI_MODEL'], 'custom-flash')
+        self.assertEqual(self.state()['env']['GEMINI_LOCATION'], 'europe-west4')
+        self.assertEqual(self.state()['env']['GCP_LOCATION'], 'us-central1')
+
+    def test_gemini_inputs_cannot_inject_environment_values(self):
+        for name in ('GEMINI_MODEL', 'GEMINI_LOCATION'):
+            self.run_setup(success=False, **{name: 'global|OWNER_EMAIL=someone-else@gmail.com'})
+        self.assertEqual(self.state()['calls'], [])
 
     def test_redeploy_without_credentials_preserves_existing_client(self):
         self.run_setup(oauth=True)
