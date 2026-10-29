@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ApplicationTracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="popup">
+    <div class="brand"><span class="mark">a↗</span> applicationtracker</div>
+    <p class="eyebrow">YOUR NEXT OPPORTUNITY</p>
+    <h1>A good role?<br />Keep it on your radar.</h1>
+    <p>Save this job to your workspace.<br />We’ll take care of the details.</p>
+    <div class="actions">
+      <button id="track">Track this job ↗</button
+      ><button id="dashboard" class="secondary">Open dashboard</button>
+    </div>
+    <p id="message" role="status" aria-live="polite"></p>
+    <section id="result" class="result" hidden>
+      <span id="result-label" class="success"></span>
+      <h2 id="company"></h2>
+      <p id="title"></p>
+      <p id="salary"></p>
+    </section>
+    <footer><span>One step at a time.</span><a href="#" id="settings">Settings</a></footer>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

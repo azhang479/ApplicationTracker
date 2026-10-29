@@ -9,20 +9,20 @@ The tests use in-memory fakes and never contact Google.
 
 Set these environment variables in Cloud Run (use Secret Manager for secrets):
 
-| Variable | Value |
-| --- | --- |
-| GOOGLE_CLOUD_PROJECT | Google Cloud project ID |
-| GCP_LOCATION | Vertex region, default us-central1 |
-| GEMINI_MODEL | Default gemini-2.5-flash |
-| OWNER_EMAIL | Owner's personal Gmail address |
-| OAUTH_CLIENT_ID | Google web OAuth client ID, also the dashboard ID-token audience |
-| OAUTH_CLIENT_SECRET | OAuth secret; also signs short-lived Gmail OAuth state |
-| EXTENSION_API_KEY | Random secret of at least 24 characters |
-| PUBLIC_URL | Cloud Run HTTPS URL, no trailing slash |
-| PUBSUB_TOPIC | projects/PROJECT/topics/TOPIC |
-| PUSH_SERVICE_ACCOUNT | Service account email expected on push and Scheduler tokens |
-| GHOSTED_AFTER_DAYS | Positive number, default 45 |
-| PORT | Default 8080 (Cloud Run sets this) |
+| Variable             | Value                                                            |
+| -------------------- | ---------------------------------------------------------------- |
+| GOOGLE_CLOUD_PROJECT | Google Cloud project ID                                          |
+| GCP_LOCATION         | Vertex region, default us-central1                               |
+| GEMINI_MODEL         | Default gemini-2.5-flash                                         |
+| OWNER_EMAIL          | Owner's personal Gmail address                                   |
+| OAUTH_CLIENT_ID      | Google web OAuth client ID, also the dashboard ID-token audience |
+| OAUTH_CLIENT_SECRET  | OAuth secret; also signs short-lived Gmail OAuth state           |
+| EXTENSION_API_KEY    | Random secret of at least 24 characters                          |
+| PUBLIC_URL           | Cloud Run HTTPS URL, no trailing slash                           |
+| PUBSUB_TOPIC         | projects/PROJECT/topics/TOPIC                                    |
+| PUSH_SERVICE_ACCOUNT | Service account email expected on push and Scheduler tokens      |
+| GHOSTED_AFTER_DAYS   | Positive number, default 45                                      |
+| PORT                 | Default 8080 (Cloud Run sets this)                               |
 
 For local development use Application Default Credentials (`gcloud auth application-default login`).
 Never commit credentials or refresh tokens. Firestore stores refresh tokens in
@@ -79,10 +79,27 @@ Firestore transactions serialize application/review mutations and dedupe capture
 For this single-owner app, those transactions read the small application/review
 collections; this is not designed for large multi-tenant datasets.
 Gmail event/review writes are idempotent before the processed marker is saved.
-History cursors never move backward. Expired history triggers a 30-day inbox resync;
-emails older than that window need manual reconciliation.
+History cursors never move backward. Each successfully processed notification saves
+lastSyncAt. Expired history only queries after that timestamp; without a timestamp,
+it resets to the notification cursor without processing any older messages.
 
 Permanent Gmail notification errors are acknowledged and need operator attention;
 transient failures return 503 for Pub/Sub retry. Monitor Cloud Run errors and the
-Gmail watch expiration. Dashboard and extension functionality are intentionally
-deferred to the next stage; no cloud resources are provisioned by this scaffold.
+Gmail watch expiration. No cloud resources are provisioned by this scaffold.
+
+## Dashboard and extension
+
+The built React dashboard is served by the server at /. It fetches the public
+OAuth client ID from /config.json, then uses Google Identity Services. Add your
+Cloud Run origin (and http://localhost:8080 for local use) to the OAuth client's
+authorized JavaScript origins. ID tokens stay in sessionStorage and are cleared
+on sign-out or a 401 response. Use the owner's account.
+
+The Applications tab supports status filters, company/title search, editing, and
+deleting applications. System-managed record IDs, timestamps and timeline entries
+are shown for reference rather than editable. Applied/last-activity dates are editable.
+Needs review lets you apply an email to a suggested application, create a new one,
+or dismiss it. Settings connects Gmail.
+
+Load the extension/ folder unpacked; see ../extension/README.md.
+Run npm run format to format source with Prettier (single quotes, 100 columns).

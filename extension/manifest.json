@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "ApplicationTracker",
+  "description": "Track a job posting in your personal application workspace.",
+  "version": "1.0.0",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://*.run.app/*", "http://localhost:8080/*"],
+  "action": { "default_popup": "popup.html", "default_title": "Track this job" },
+  "options_page": "options.html"
+}

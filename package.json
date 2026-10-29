@@ -10,9 +10,13 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test -w server",
     "build": "npm run build -w web && npm run build -w server",
-    "start": "node server/dist/index.js"
+    "start": "node server/dist/index.js",
+    "format": "prettier --write ."
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
   }
 }
