@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ApplicationTracker settings</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="options">
+      <div class="brand"><span class="mark">a↗</span> applicationtracker</div>
+      <p class="eyebrow">MAKE YOURSELF AT HOME</p>
+      <h1>Connect your workspace</h1>
+      <p>
+        Add your dashboard address and the API key from your server settings. You only need to do
+        this once.
+      </p>
+      <form id="options">
+        <label
+          >Dashboard address<input
+            id="backend"
+            type="url"
+            required
+            placeholder="https://your-service.run.app"
+        /></label>
+        <label>API key<input id="key" type="password" required autocomplete="off" /></label>
+        <p>
+          Your key is saved using Chrome sync. Only use this extension in your own Chrome profile.
+        </p>
+        <button type="submit">Save settings</button>
+      </form>
+      <p id="message" role="status" aria-live="polite"></p>
+      <script type="module" src="options.js"></script>
+    </main>
+  </body>
+</html>
