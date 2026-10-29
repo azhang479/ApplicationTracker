@@ -1,0 +1,10 @@
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+.env.*
+*.pem
+*.key
+node_modules/
+**/node_modules/
+**/dist/
