@@ -136,6 +136,43 @@ describe('capture request validation and structured errors', () => {
   });
 });
 describe('Pub/Sub structured errors', () => {
+  it.each([1234567, '1234567'])(
+    'normalizes a real-shaped Gmail push history ID %s to a string',
+    async (historyId) => {
+      const push = {
+        message: {
+          data: Buffer.from(
+            JSON.stringify({ emailAddress: config.OWNER_EMAIL, historyId }),
+          ).toString('base64'),
+          messageId: '2070443601311540',
+          publishTime: '2026-10-29T21:00:00.000Z',
+        },
+        subscription: 'projects/test/subscriptions/gmail-notifications-push',
+      };
+      expect((await post(push, '/pubsub/gmail')).status).toBe(204);
+      expect(processNotification).toHaveBeenCalledExactlyOnceWith({
+        emailAddress: config.OWNER_EMAIL,
+        historyId: '1234567',
+      });
+      expect(log).not.toHaveBeenCalled();
+    },
+  );
+  it.each([undefined, null, true, {}, []])(
+    'rejects an invalid history ID %s without processing it',
+    async (historyId) => {
+      const push = {
+        message: {
+          data: Buffer.from(
+            JSON.stringify({ emailAddress: config.OWNER_EMAIL, historyId }),
+          ).toString('base64'),
+        },
+      };
+      expect((await post(push, '/pubsub/gmail')).status).toBe(204);
+      expect(processNotification).not.toHaveBeenCalled();
+      expect(logged().message).toBe('Invalid Gmail notification: Validation failed');
+      expect(logged().issues[0].path).toEqual(['historyId']);
+    },
+  );
   const envelope = {
     message: {
       data: Buffer.from(

@@ -141,7 +141,10 @@ export function createApp(
       let notification;
       try {
         notification = z
-          .object({ emailAddress: z.string(), historyId: z.string() })
+          .object({
+            emailAddress: z.string(),
+            historyId: z.union([z.string(), z.number()]).transform(String),
+          })
           .parse(JSON.parse(Buffer.from(envelope.data.message.data, 'base64').toString()));
       } catch (error) {
         report(error, 'Invalid Gmail notification', req);
