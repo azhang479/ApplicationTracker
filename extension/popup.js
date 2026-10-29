@@ -26,13 +26,20 @@ track.addEventListener('click', async () => {
     });
     if (!injection?.result)
       throw new Error('This page could not be read. Try another job posting.');
-    const response = await fetch(config.url + '/api/capture', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': config.apiKey },
-      body: JSON.stringify(injection.result),
-      signal: AbortSignal.timeout(90000),
-    });
-    if (response.status === 401) throw new Error('Your API key was not accepted. Check Settings.');
+    let response;
+    try {
+      response = await fetch(config.url + '/api/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': config.apiKey },
+        body: JSON.stringify(injection.result),
+        signal: AbortSignal.timeout(90000),
+      });
+    } catch {
+      throw new Error("Can't reach the server. Check the backend URL in Settings.");
+    }
+    if (response.status === 401) throw new Error("API key doesn't match. Check Settings.");
+    if (response.status === 400) throw new Error("Couldn't read this job page.");
+    if (response.status >= 500) throw new Error('Server error. Try again.');
     if (!response.ok) throw new Error('The job could not be saved. Please try again in a moment.');
     const job = await response.json();
     message.textContent = '';

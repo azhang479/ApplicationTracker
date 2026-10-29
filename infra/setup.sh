@@ -4,6 +4,8 @@ set -euo pipefail
 : "${PROJECT_ID:?Set PROJECT_ID to your billing-enabled Google Cloud project ID}"
 : "${OWNER_EMAIL:?Set OWNER_EMAIL to your personal Gmail address}"
 REGION="${REGION:-us-central1}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3-flash-preview}"
+GEMINI_LOCATION="${GEMINI_LOCATION:-global}"
 OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID:-}"
 OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-}"
 OAUTH_READY=false
@@ -14,7 +16,7 @@ fi
 for tool in gcloud python3; do
   command -v "$tool" >/dev/null || { printf 'Install %s before continuing.\n' "$tool" >&2; exit 1; }
 done
-for value in "$PROJECT_ID" "$OWNER_EMAIL" "$REGION" "$OAUTH_CLIENT_ID"; do
+for value in "$PROJECT_ID" "$OWNER_EMAIL" "$REGION" "$OAUTH_CLIENT_ID" "$GEMINI_MODEL" "$GEMINI_LOCATION"; do
   if [[ "$value" == *'|'* || "$value" == *$'\n'* ]]; then
     printf 'Inputs must not contain a pipe character or newline.\n' >&2
     exit 1
@@ -135,7 +137,7 @@ fi
   --service-account="$RUNTIME" \
   --build-service-account="projects/$PROJECT_ID/serviceAccounts/$BUILDER" \
   --allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --timeout=300s \
-  --update-env-vars="^|^GOOGLE_CLOUD_PROJECT=$PROJECT_ID|GCP_LOCATION=$REGION|OWNER_EMAIL=$OWNER_EMAIL|OAUTH_CLIENT_ID=$CLIENT_ID|PUBLIC_URL=$PUBLIC_URL|PUBSUB_TOPIC=$TOPIC|PUSH_SERVICE_ACCOUNT=$INVOKER|GEMINI_MODEL=gemini-2.5-flash|GHOSTED_AFTER_DAYS=45" \
+  --update-env-vars="^|^GOOGLE_CLOUD_PROJECT=$PROJECT_ID|GCP_LOCATION=$REGION|GEMINI_LOCATION=$GEMINI_LOCATION|OWNER_EMAIL=$OWNER_EMAIL|OAUTH_CLIENT_ID=$CLIENT_ID|PUBLIC_URL=$PUBLIC_URL|PUBSUB_TOPIC=$TOPIC|PUSH_SERVICE_ACCOUNT=$INVOKER|GEMINI_MODEL=$GEMINI_MODEL|GHOSTED_AFTER_DAYS=45" \
   --update-secrets="EXTENSION_API_KEY=$KEY_SECRET:$KEY_VERSION,OAUTH_CLIENT_SECRET=$OAUTH_SECRET:$OAUTH_VERSION"
 URL="$("${GCLOUD[@]}" run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
 if [[ "$PUBLIC_URL" != "$URL" ]]; then

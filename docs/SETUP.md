@@ -46,7 +46,19 @@ gcloud auth list
 Confirm the active account is allowed to administer that project. Choose REGION
 before the first run: a Firestore database's location cannot be changed later.
 `us-central1` is the tested default; other regions must support Cloud Run, Firestore,
-Cloud Scheduler, and the chosen Vertex AI model.
+Cloud Scheduler. Gemini uses a separate location, `global`, so it does not depend
+on your database or Cloud Run region. The default model is `gemini-3-flash-preview`.
+To use another available model or endpoint, set these optional variables before
+running `infra/setup.sh` (including on redeployments):
+
+```bash
+export GEMINI_MODEL='gemini-3-flash-preview'
+export GEMINI_LOCATION='global'
+```
+
+If logs report that a publisher model was not found or your project has no access,
+check that model's availability and location. A regional endpoint may not serve a
+model available on `global`; this is separate from the Cloud Run region.
 
 ### What is Firestore?
 

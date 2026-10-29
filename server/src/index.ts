@@ -8,7 +8,7 @@ import { createApp } from './app.js';
 
 const config = loadConfig();
 const store = new FirestoreStore();
-const ai = new VertexAI(config.GOOGLE_CLOUD_PROJECT, config.GCP_LOCATION, config.GEMINI_MODEL);
+const ai = new VertexAI(config.GOOGLE_CLOUD_PROJECT, config.GEMINI_LOCATION, config.GEMINI_MODEL);
 const tracker = new Tracker(store, ai);
 const app = createApp(
   config,
