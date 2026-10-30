@@ -95,3 +95,199 @@
     backdrop-filter: blur(2px);
   }
 }
+
+:root {
+  --page: #fafafa;
+  --surface: #ffffff;
+  --subtle: #f5f5f5;
+  --field: #fafafa;
+  --border: #d4d4d4;
+  --ink: #171717;
+  --muted: #404040;
+  --faint: #525252;
+  --accent: #000000;
+  --accent-hover: #262626;
+  --accent-soft: #f5f5f5;
+  --card-shadow: none;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+}
+*,
+::before,
+::after {
+  border-color: var(--border);
+}
+.bg-white,
+.drawer {
+  background-color: var(--surface);
+}
+header.bg-white {
+  background-color: var(--subtle);
+}
+.bg-slate-50,
+.bg-slate-100,
+[class~='bg-slate-50/40'] {
+  background-color: var(--field);
+}
+.border-slate-100,
+.border-slate-200 {
+  border-color: var(--border);
+}
+.text-slate-800 {
+  color: var(--ink);
+}
+.text-slate-500,
+.text-slate-600,
+.text-slate-700,
+label {
+  color: var(--muted);
+}
+.text-slate-300,
+.text-slate-400,
+.eyebrow {
+  color: var(--faint);
+}
+.card {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--card-shadow);
+}
+input:not([type='checkbox']),
+select,
+textarea {
+  background-color: var(--field);
+  border-color: var(--border);
+  color: var(--ink);
+}
+.primary-button,
+.brand-icon,
+.chip-active {
+  background: var(--accent);
+  color: white;
+}
+.primary-button:hover,
+.chip-active:hover {
+  background: var(--accent-hover);
+}
+.secondary-button,
+.chip {
+  background-color: var(--surface);
+  border-color: var(--border);
+  color: var(--muted);
+}
+.chip-active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.secondary-button:hover,
+.chip:not(.chip-active):hover,
+.icon-button:hover {
+  background-color: var(--subtle);
+}
+.tab {
+  color: var(--muted);
+  border-color: transparent;
+}
+.tab-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.link {
+  color: var(--accent);
+}
+.company-icon {
+  background: var(--field);
+  border-color: var(--border);
+  color: var(--muted);
+}
+.table-head {
+  background: var(--field);
+  color: var(--muted);
+}
+.application-row {
+  border-color: var(--border);
+}
+.application-row:hover {
+  background: var(--field);
+}
+:is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+h1 {
+  font-weight: 500;
+  letter-spacing: -0.045em;
+}
+body {
+  accent-color: #000;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #737373;
+}
+.focus-visible\:ring-slate-500:focus-visible {
+  --tw-ring-color: #737373;
+}
+.text-button:hover,
+.link:hover,
+.tab:hover {
+  color: #171717;
+}
+.icon-button:hover {
+  background-color: #f5f5f5;
+}
+.card,
+.brand-icon,
+.chip,
+.primary-button,
+.secondary-button {
+  border-radius: 0.25rem;
+}
+.status-badge {
+  background-color: #f5f5f5;
+  color: #262626;
+  --tw-ring-color: #d4d4d4;
+  border-radius: 0.25rem;
+}
+.danger-button,
+[class*='text-rose-'],
+[class*='text-emerald-'] {
+  color: #262626;
+}
+.danger-button:hover,
+[class*='bg-rose-'] {
+  background-color: #f5f5f5;
+}
+[class*='border-rose-'] {
+  border-color: #737373;
+}
+input:not([type='checkbox']),
+select,
+textarea {
+  border-radius: 0.25rem;
+  box-shadow: none;
+}
+[class~='!bg-slate-50'] {
+  background-color: var(--field) !important;
+}
+.application-row td {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+main > .grid .card {
+  padding: 1.5rem;
+}
+.link {
+  text-decoration-color: #737373;
+}
+@media (min-width: 768px) {
+  main {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+}
