@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortApplications, type SortKey } from '../../web/src/sort';
+import { sortApplications, defaultSortDirection, type SortKey } from '../../web/src/sort';
 import { statuses } from '../../web/src/types';
 
 const apps = [
@@ -34,6 +34,15 @@ const apps = [
 const ids = (items: typeof apps) => items.map((app) => app.id);
 
 describe('application sorting', () => {
+  it.each([
+    ['company', 'asc'],
+    ['status', 'asc'],
+    ['salary', 'desc'],
+    ['appliedAt', 'desc'],
+    ['lastActivityAt', 'desc'],
+  ] as const)('defaults %s to %s when selecting a new column', (key, direction) => {
+    expect(defaultSortDirection(key)).toBe(direction);
+  });
   it('defaults to newest last activity first', () => {
     expect(ids(sortApplications(apps))).toEqual(['b', 'c', 'a']);
   });

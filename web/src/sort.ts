@@ -2,6 +2,10 @@ import { statuses, type Application } from './types';
 
 export type SortKey = 'company' | 'status' | 'salary' | 'appliedAt' | 'lastActivityAt';
 export type SortDirection = 'asc' | 'desc';
+export function defaultSortDirection(key: SortKey): SortDirection {
+  return key === 'company' || key === 'status' ? 'asc' : 'desc';
+}
+
 type SortableApplication = Pick<
   Application,
   'company' | 'status' | 'salaryMax' | 'salaryMin' | 'appliedAt' | 'lastActivityAt'

@@ -329,6 +329,38 @@ main {
   padding-top: 1rem;
   padding-bottom: 1rem;
 }
+.application-filters .chip {
+  background: #fff;
+  border-color: var(--border);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.875rem;
+}
+.application-filters .chip-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+.application-filters .chip-active:hover {
+  background: #1e293b;
+}
+.column-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+}
+.column-sort:hover,
+th[aria-sort='ascending'],
+th[aria-sort='descending'] {
+  color: var(--ink);
+}
+th.table-head:has(.column-sort) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
 @media (max-width: 479px) {
   .workspace-nav .tab {
     padding: 0.5rem 0.625rem;
