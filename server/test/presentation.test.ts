@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { salary, defaultStatus, formatDate } from '../../web/src/types';
 import { backendUrl, salary as extensionSalary } from '../../extension/shared.js';
+import { reviewApplications } from '../../web/src/review';
 
 describe('dashboard presentation', () => {
   const job = { salaryMin: 120000, salaryMax: 150000, salaryCurrency: 'USD', salaryPeriod: 'year' };
@@ -24,6 +25,42 @@ describe('dashboard presentation', () => {
   });
   it('marks extension salary estimates', () => {
     expect(extensionSalary({ ...job, salaryIsEstimated: true })).toBe('$120k–$150k/yr · est.');
+  });
+});
+describe('review application options', () => {
+  const apps = [
+    { id: 'z', company: 'Zenith', title: 'Engineer' },
+    { id: 'b', company: 'Acme', title: 'Product Designer' },
+    { id: 'a', company: 'Acme', title: 'Backend Engineer' },
+    { id: 'c', company: 'Beta', title: 'Engineer' },
+  ];
+  const candidates = [
+    { applicationId: 'z', company: 'Zenith', title: 'Engineer', score: 1.5 },
+    { applicationId: 'c', company: 'Beta', title: 'Engineer', score: 0.8 },
+  ];
+  it('puts candidates first in ranked order with scores and does not repeat them', () => {
+    const options = reviewApplications(apps, candidates);
+    expect(options.bestMatches).toEqual([
+      { ...apps[0], score: 1.5 },
+      { ...apps[3], score: 0.8 },
+    ]);
+    expect(options.others.map((app) => app.id)).toEqual(['a', 'b']);
+    expect(apps.map((app) => app.id)).toEqual(['z', 'b', 'a', 'c']);
+  });
+  it('sorts all applications by company then title when there are no candidates', () => {
+    const options = reviewApplications(apps, []);
+    expect(options.bestMatches).toEqual([]);
+    expect(options.others.map((app) => app.id)).toEqual(['a', 'b', 'c', 'z']);
+  });
+  it('handles no applications and ignores missing or repeated candidates', () => {
+    expect(reviewApplications([], candidates)).toEqual({ bestMatches: [], others: [] });
+    const options = reviewApplications(apps, [
+      { ...candidates[0], applicationId: 'deleted' },
+      candidates[1],
+      candidates[1],
+    ]);
+    expect(options.bestMatches).toEqual([{ ...apps[3], score: 0.8 }]);
+    expect(options.others.map((app) => app.id)).toEqual(['a', 'b', 'z']);
   });
 });
 describe('extension address validation', () => {
