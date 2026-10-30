@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SignIn } from './auth';
 import { Drawer } from './Drawer';
 import { ReviewCard } from './ReviewCard';
+import { sortApplications, type SortKey, type SortDirection } from './sort';
 import {
   Application,
   Job,
@@ -22,6 +23,8 @@ export function App() {
   const [gmail, setGmail] = useState<GmailStatus>({ connected: false, watchExpiration: null });
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('lastActivityAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selected, setSelected] = useState<Application | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -101,10 +104,14 @@ export function App() {
     await refresh();
   }
   if (!token) return <SignIn onToken={onToken} />;
-  const visible = apps.filter(
-    (app) =>
-      (filter === 'All' || app.status === filter) &&
-      (app.company + ' ' + app.title).toLowerCase().includes(search.toLowerCase()),
+  const visible = sortApplications(
+    apps.filter(
+      (app) =>
+        (filter === 'All' || app.status === filter) &&
+        (app.company + ' ' + app.title).toLowerCase().includes(search.toLowerCase()),
+    ),
+    sortKey,
+    sortDirection,
   );
   const active = apps.filter(
     (a) => !['Rejected', 'Withdrawn', 'Ghosted'].includes(a.status),
@@ -228,16 +235,39 @@ export function App() {
                 {visible.length} of {apps.length} applications
               </span>
             </div>
-            <label className="status-filter mb-5">
-              Filter by status
-              <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-                {['All', ...statuses].map((s) => (
-                  <option key={s} value={s}>
-                    {s} ({s === 'All' ? apps.length : apps.filter((a) => a.status === s).length})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-wrap items-end gap-3 mb-5">
+              <label className="status-filter">
+                Filter by status
+                <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+                  {['All', ...statuses].map((s) => (
+                    <option key={s} value={s}>
+                      {s} ({s === 'All' ? apps.length : apps.filter((a) => a.status === s).length})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="status-filter">
+                <label htmlFor="application-sort">Sort by</label>
+                <select
+                  id="application-sort"
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as SortKey)}
+                >
+                  <option value="company">Company</option>
+                  <option value="status">Status</option>
+                  <option value="salary">Salary</option>
+                  <option value="appliedAt">Date applied</option>
+                  <option value="lastActivityAt">Last activity</option>
+                </select>
+              </div>
+              <button
+                className="secondary-button"
+                aria-label={sortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'}
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+              >
+                {sortDirection === 'asc' ? '↑ Ascending' : '↓ Descending'}
+              </button>
+            </div>
             <div className="card overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between">
                 <label className="relative w-full sm:w-80">
