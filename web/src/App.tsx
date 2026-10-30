@@ -110,7 +110,7 @@ export function App() {
     (a) => !['Rejected', 'Withdrawn', 'Ghosted'].includes(a.status),
   ).length;
   return (
-    <div className="min-h-screen">
+    <div className="workspace-shell min-h-screen">
       <header className="bg-white border-b">
         <div className="max-w-[1440px] mx-auto px-6 md:px-10 h-20 flex items-center justify-between">
           <a href="/" className="flex items-center gap-3">
@@ -138,10 +138,10 @@ export function App() {
         </div>
       </header>
       <main className="workspace-main max-w-[1440px] mx-auto px-6 md:px-10 py-10">
-        <div className="flex items-center justify-between mb-8">
+        <div className="workspace-hero flex items-center justify-between mb-8">
           <div>
             <p className="eyebrow mb-3">YOUR CAREER, IN MOTION</p>
-            <h1 className="text-3xl font-semibold tracking-tight">Keep your next move in view.</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Your workspace</h1>
             <p className="text-slate-500 text-sm mt-3">
               A home for every application. A clear path to what comes next.
             </p>
