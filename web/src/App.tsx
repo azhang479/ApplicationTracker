@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SignIn } from './auth';
 import { Drawer } from './Drawer';
 import { ReviewCard } from './ReviewCard';
+import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
   Application,
   Job,
@@ -14,6 +15,13 @@ import {
 } from './types';
 
 type GmailStatus = { connected: boolean; watchExpiration: string | null };
+const sortColumns: { key: SortKey; label: string }[] = [
+  { key: 'company', label: 'Company / role' },
+  { key: 'status', label: 'Status' },
+  { key: 'salary', label: 'Salary' },
+  { key: 'appliedAt', label: 'Date applied' },
+  { key: 'lastActivityAt', label: 'Last activity' },
+];
 export function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem('idToken') || '');
   const [tab, setTab] = useState('Applications');
@@ -22,6 +30,8 @@ export function App() {
   const [gmail, setGmail] = useState<GmailStatus>({ connected: false, watchExpiration: null });
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('lastActivityAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selected, setSelected] = useState<Application | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -100,11 +110,21 @@ export function App() {
     await api('/api/review/' + encodeURIComponent(id) + '/resolve', 'POST', action);
     await refresh();
   }
+  function changeSort(key: SortKey) {
+    let direction = defaultSortDirection(key);
+    if (key === sortKey) direction = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortKey(key);
+    setSortDirection(direction);
+  }
   if (!token) return <SignIn onToken={onToken} />;
-  const visible = apps.filter(
-    (app) =>
-      (filter === 'All' || app.status === filter) &&
-      (app.company + ' ' + app.title).toLowerCase().includes(search.toLowerCase()),
+  const visible = sortApplications(
+    apps.filter(
+      (app) =>
+        (filter === 'All' || app.status === filter) &&
+        (app.company + ' ' + app.title).toLowerCase().includes(search.toLowerCase()),
+    ),
+    sortKey,
+    sortDirection,
   );
   const active = apps.filter(
     (a) => !['Rejected', 'Withdrawn', 'Ghosted'].includes(a.status),
@@ -228,16 +248,27 @@ export function App() {
                 {visible.length} of {apps.length} applications
               </span>
             </div>
-            <label className="status-filter mb-5">
-              Filter by status
-              <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-                {['All', ...statuses].map((s) => (
-                  <option key={s} value={s}>
-                    {s} ({s === 'All' ? apps.length : apps.filter((a) => a.status === s).length})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div
+              className="application-filters flex flex-wrap gap-2 mb-5"
+              role="group"
+              aria-label="Filter by status"
+            >
+              {['All', ...statuses].map((status) => (
+                <button
+                  key={status}
+                  className={'chip ' + (filter === status ? 'chip-active' : '')}
+                  aria-pressed={filter === status}
+                  onClick={() => setFilter(status)}
+                >
+                  {status}
+                  <span className="ml-2 opacity-60">
+                    {status === 'All'
+                      ? apps.length
+                      : apps.filter((app) => app.status === status).length}
+                  </span>
+                </button>
+              ))}
+            </div>
             <div className="card overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between">
                 <label className="relative w-full sm:w-80">
@@ -256,22 +287,39 @@ export function App() {
                   Select an application to see the details
                 </span>
               </div>
-              <div className="overflow-x-auto">
+              <div
+                className="overflow-x-auto"
+                tabIndex={0}
+                role="region"
+                aria-label="Applications table"
+              >
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead>
                     <tr>
-                      {[
-                        'Company / role',
-                        'Status',
-                        'Salary',
-                        'Date applied',
-                        'Last activity',
-                        '',
-                      ].map((h, i) => (
-                        <th key={i} scope="col" className="table-head">
-                          {h}
+                      {sortColumns.map(({ key, label }) => (
+                        <th
+                          key={key}
+                          scope="col"
+                          className="table-head"
+                          aria-sort={
+                            sortKey === key
+                              ? sortDirection === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                          }
+                        >
+                          <button className="column-sort" onClick={() => changeSort(key)}>
+                            {label}
+                            <span className="inline-block w-3" aria-hidden="true">
+                              {sortKey === key ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                            </span>
+                          </button>
                         </th>
                       ))}
+                      <th scope="col" className="table-head relative">
+                        <span className="sr-only">Details</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
