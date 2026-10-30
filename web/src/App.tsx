@@ -138,10 +138,10 @@ export function App() {
         </div>
       </header>
       <main className="max-w-[1440px] mx-auto px-6 md:px-10 py-10">
-        <div className="flex items-center justify-between mb-8">
+        <div className="workspace-hero flex items-center justify-between mb-8">
           <div>
             <p className="eyebrow mb-3">YOUR CAREER, IN MOTION</p>
-            <h1 className="text-3xl font-semibold tracking-tight">Keep your next move in view.</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Your workspace</h1>
             <p className="text-slate-500 text-sm mt-3">
               A home for every application. A clear path to what comes next.
             </p>
@@ -157,7 +157,7 @@ export function App() {
             </div>
           </div>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4 mb-9">
+        <div className="workspace-stats grid sm:grid-cols-3 gap-4 mb-9">
           {[
             ['Applications tracked', apps.length, 'Every opportunity, organized.'],
             ['Active applications', active, 'Good things are in the works.'],
@@ -175,7 +175,7 @@ export function App() {
             </div>
           ))}
         </div>
-        <nav className="flex gap-7 border-b mb-7" aria-label="Workspace tabs">
+        <nav className="workspace-nav flex gap-7 border-b mb-7" aria-label="Workspace tabs">
           {['Applications', 'Needs review', 'Settings'].map((name) => (
             <button
               key={name}
@@ -228,21 +228,16 @@ export function App() {
                 {visible.length} of {apps.length} applications
               </span>
             </div>
-            <div className="flex gap-2 flex-wrap mb-5">
-              {['All', ...statuses].map((s) => (
-                <button
-                  className={'chip ' + (filter === s ? 'chip-active' : '')}
-                  key={s}
-                  onClick={() => setFilter(s)}
-                  aria-pressed={filter === s}
-                >
-                  {s}
-                  <span className="ml-2 opacity-60">
-                    {s === 'All' ? apps.length : apps.filter((a) => a.status === s).length}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <label className="status-filter mb-5">
+              Filter by status
+              <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+                {['All', ...statuses].map((s) => (
+                  <option key={s} value={s}>
+                    {s} ({s === 'All' ? apps.length : apps.filter((a) => a.status === s).length})
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="card overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between">
                 <label className="relative w-full sm:w-80">
