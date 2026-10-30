@@ -1,15 +1,32 @@
-import { useState } from 'react';
-import { Review, Status, statuses, defaultStatus, categoryName, formatDate } from './types';
+import { useId, useState } from 'react';
+import {
+  Application,
+  Review,
+  Status,
+  statuses,
+  defaultStatus,
+  categoryName,
+  formatDate,
+} from './types';
 import { blankJob, JobFields } from './JobFields';
+import { reviewApplications } from './review';
 
 export function ReviewCard({
   item,
+  applications,
   resolve,
 }: {
   item: Review;
+  applications: Application[];
   resolve: (id: string, action: object) => Promise<void>;
 }) {
-  const [choices, setChoices] = useState<Record<string, Status>>({});
+  const id = useId();
+  const { bestMatches, others } = reviewApplications(applications, item.candidates);
+  const [applicationId, setApplicationId] = useState(bestMatches[0]?.id || '');
+  const [status, setStatus] = useState<Status>(defaultStatus(item.classification.category));
+  const selectedApplicationId = applications.some((app) => app.id === applicationId)
+    ? applicationId
+    : '';
   const [creating, setCreating] = useState(false);
   const [job, setJob] = useState({
     ...blankJob,
@@ -70,55 +87,67 @@ export function ReviewCard({
       </div>
       <div className="border-t p-6 bg-slate-50/40">
         <h3 className="eyebrow mb-4">WHICH APPLICATION IS THIS FOR?</h3>
-        {item.candidates.length === 0 && (
+        {bestMatches.length === 0 && (
           <p className="text-sm text-slate-500 mb-5">
-            No matching applications found. You can create a new one below.
+            {applications.length === 0
+              ? 'No applications yet. Create a new one below.'
+              : 'No suggested matches. Choose an application or create a new one below.'}
           </p>
         )}
-        <div className="space-y-3">
-          {item.candidates.map((candidate) => (
-            <div
-              key={candidate.applicationId}
-              className="flex flex-wrap items-center gap-3 bg-white border rounded-lg p-4"
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem_auto] items-end bg-white border rounded-lg p-4">
+          <div className="min-w-0">
+            <label htmlFor={id + '-application'}>Application</label>
+            <select
+              id={id + '-application'}
+              value={selectedApplicationId}
+              disabled={busy || applications.length === 0}
+              onChange={(e) => setApplicationId(e.target.value)}
             >
-              <div className="flex-1 min-w-40">
-                <p className="text-sm font-semibold">{candidate.company}</p>
-                <p className="text-sm text-slate-500 mt-1">{candidate.title}</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Match score: {candidate.score.toFixed(2)}
-                </p>
-              </div>
-              <select
-                className="!w-auto !mt-0 text-sm"
-                aria-label={'New status for ' + candidate.company + ' ' + candidate.title}
-                value={
-                  choices[candidate.applicationId] || defaultStatus(item.classification.category)
-                }
-                onChange={(e) =>
-                  setChoices({ ...choices, [candidate.applicationId]: e.target.value as Status })
-                }
-              >
-                {statuses.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-              <button
-                className="primary-button"
-                disabled={busy}
-                onClick={() =>
-                  void act({
-                    type: 'apply',
-                    applicationId: candidate.applicationId,
-                    status:
-                      choices[candidate.applicationId] ||
-                      defaultStatus(item.classification.category),
-                  })
-                }
-              >
-                Apply to this
-              </button>
-            </div>
-          ))}
+              <option value="" disabled>
+                Select an application…
+              </option>
+              {bestMatches.length > 0 && (
+                <optgroup label="Best matches">
+                  {bestMatches.map((app) => (
+                    <option key={app.id} value={app.id}>
+                      {app.company} — {app.title} (score: {app.score.toFixed(2)})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {others.length > 0 && (
+                <optgroup label="All applications">
+                  {others.map((app) => (
+                    <option key={app.id} value={app.id}>
+                      {app.company} — {app.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+          <div>
+            <label htmlFor={id + '-status'}>Status</label>
+            <select
+              id={id + '-status'}
+              value={status}
+              disabled={busy}
+              onChange={(e) => setStatus(e.target.value as Status)}
+            >
+              {statuses.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="primary-button"
+            disabled={busy || !selectedApplicationId}
+            onClick={() =>
+              void act({ type: 'apply', applicationId: selectedApplicationId, status })
+            }
+          >
+            Apply
+          </button>
         </div>
         <div className="flex justify-between items-center mt-5">
           <button

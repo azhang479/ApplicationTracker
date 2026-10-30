@@ -358,7 +358,7 @@ export function App() {
             </p>
             <div className="space-y-5">
               {reviews.map((item) => (
-                <ReviewCard key={item.id} item={item} resolve={resolve} />
+                <ReviewCard key={item.id} item={item} applications={apps} resolve={resolve} />
               ))}
             </div>
             {reviews.length === 0 && (
