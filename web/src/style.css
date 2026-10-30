@@ -244,3 +244,134 @@ h2 {
 [class~='!bg-slate-50'] {
   background-color: var(--field) !important;
 }
+
+main {
+  max-width: 1320px;
+  padding-top: 4rem;
+}
+.workspace-hero {
+  margin-bottom: 3.5rem;
+  align-items: flex-end;
+  gap: 2rem;
+}
+.workspace-hero h1 {
+  font-size: clamp(2.75rem, 4.8vw, 4.5rem);
+  line-height: 1.08;
+  max-width: 15ch;
+  font-weight: 400;
+}
+.workspace-hero h1 + p {
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  max-width: 36rem;
+  line-height: 1.7;
+}
+.workspace-hero .eyebrow {
+  margin-bottom: 1.5rem;
+}
+.workspace-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 1.75rem 0;
+  margin-bottom: 3rem;
+}
+.workspace-stats .card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 2rem;
+}
+.workspace-stats .card:first-child {
+  padding-left: 0;
+}
+.workspace-stats .card + .card {
+  border-left: 1px solid var(--border);
+}
+.workspace-stats .text-3xl {
+  font-family: ui-serif, Georgia, serif;
+  font-size: 3rem;
+  font-weight: 400;
+  margin-top: 0.75rem;
+}
+.workspace-stats [aria-hidden] {
+  display: none;
+}
+.workspace-nav {
+  gap: 2.5rem;
+  margin-bottom: 2.5rem;
+}
+.workspace-nav .tab {
+  font-family: ui-serif, Georgia, serif;
+  font-size: 1.25rem;
+  padding-bottom: 1rem;
+}
+.application-ledger {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.application-ledger > .border-b {
+  padding: 1.25rem 0;
+}
+.application-ledger .table-head {
+  background: transparent;
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+.application-ledger .application-row td {
+  padding-top: 1.75rem;
+  padding-bottom: 1.75rem;
+}
+.application-ledger .application-row td:first-child,
+.application-ledger th:first-child {
+  padding-left: 0;
+}
+.application-ledger .company-icon {
+  border-radius: 50%;
+  background: transparent;
+}
+.application-ledger > .border-t {
+  padding-left: 0;
+  background: transparent;
+}
+article.card {
+  border-radius: 0;
+  box-shadow: none;
+}
+article > .p-6 {
+  padding: 2rem;
+}
+@media (max-width: 639px) {
+  main {
+    padding-top: 2.5rem;
+  }
+  .workspace-stats {
+    padding: 1.25rem 0;
+  }
+  .workspace-stats .card {
+    padding: 0 0.75rem;
+  }
+  .workspace-stats .text-sm {
+    font-size: 0.6875rem;
+  }
+  .workspace-stats .text-xs {
+    display: none;
+  }
+  .workspace-stats .text-3xl {
+    font-size: 2.25rem;
+  }
+  .workspace-nav {
+    gap: 1.25rem;
+  }
+  .workspace-nav .tab {
+    font-size: 1rem;
+  }
+  article > .p-6 {
+    padding: 1.25rem;
+  }
+}
