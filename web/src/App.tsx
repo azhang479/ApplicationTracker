@@ -138,7 +138,7 @@ export function App() {
         </div>
       </header>
       <main className="max-w-[1440px] mx-auto px-6 md:px-10 py-10">
-        <div className="flex items-center justify-between mb-8">
+        <div className="workspace-hero flex items-center justify-between mb-8">
           <div>
             <p className="eyebrow mb-3">YOUR CAREER, IN MOTION</p>
             <h1 className="text-3xl font-semibold tracking-tight">Keep your next move in view.</h1>
@@ -157,7 +157,7 @@ export function App() {
             </div>
           </div>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4 mb-9">
+        <div className="workspace-stats grid sm:grid-cols-3 gap-4 mb-9">
           {[
             ['Applications tracked', apps.length, 'Every opportunity, organized.'],
             ['Active applications', active, 'Good things are in the works.'],
@@ -166,7 +166,7 @@ export function App() {
             <div className="card p-5 flex justify-between" key={label}>
               <div>
                 <p className="text-sm text-slate-500">{label}</p>
-                <p className="text-3xl font-semibold tracking-tight mt-3">{count}</p>
+                <p className="stat-number text-3xl font-semibold tracking-tight mt-3">{count}</p>
                 <p className="text-xs text-slate-400 mt-3">{note}</p>
               </div>
               <span className="text-slate-300 text-xl" aria-hidden="true">
@@ -175,7 +175,7 @@ export function App() {
             </div>
           ))}
         </div>
-        <nav className="flex gap-7 border-b mb-7" aria-label="Workspace tabs">
+        <nav className="workspace-nav flex gap-7 border-b mb-7" aria-label="Workspace tabs">
           {['Applications', 'Needs review', 'Settings'].map((name) => (
             <button
               key={name}
@@ -312,7 +312,7 @@ export function App() {
                             {app.status}
                           </span>
                         </td>
-                        <td className="px-5 py-5 text-slate-600">
+                        <td className="numeric-cell px-5 py-5 text-slate-600">
                           {salary(app)}
                           {app.salaryIsEstimated && (
                             <span className="ml-2 text-[10px] border rounded px-1 py-0.5 text-slate-400">
@@ -320,8 +320,10 @@ export function App() {
                             </span>
                           )}
                         </td>
-                        <td className="px-5 py-5 text-slate-500">{formatDate(app.appliedAt)}</td>
-                        <td className="px-5 py-5 text-slate-500">
+                        <td className="numeric-cell px-5 py-5 text-slate-500">
+                          {formatDate(app.appliedAt)}
+                        </td>
+                        <td className="numeric-cell px-5 py-5 text-slate-500">
                           {formatDate(app.lastActivityAt)}
                         </td>
                         <td className="px-4 text-slate-300">↗</td>

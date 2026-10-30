@@ -291,3 +291,176 @@ main > .grid .card {
     padding-bottom: 3rem;
   }
 }
+
+:root {
+  --page: #fff;
+  --subtle: #fff;
+  --field: #fff;
+  --border: #000;
+  --ink: #000;
+  --muted: #262626;
+  --card-shadow: none;
+}
+*,
+::before,
+::after {
+  border-color: #000;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+body,
+header.bg-white,
+.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+[class~='bg-slate-50/40'] {
+  background-color: #fff;
+}
+[class~='!bg-slate-50'] {
+  background-color: #fff !important;
+}
+.card,
+input:not([type='checkbox']),
+select,
+textarea,
+.secondary-button,
+.chip,
+.company-icon {
+  border: 1.5px solid #000;
+}
+header,
+footer,
+nav,
+.border-t,
+.border-b,
+.border-y,
+.table-head,
+.application-row {
+  border-color: #000;
+}
+.border-t {
+  border-top-width: 1.5px;
+}
+.border-b,
+.table-head,
+.application-row {
+  border-bottom-width: 1.5px;
+}
+.border-y {
+  border-top-width: 1.5px;
+  border-bottom-width: 1.5px;
+}
+.workspace-hero {
+  padding-bottom: 2rem;
+  border-bottom: 1.5px solid #000;
+}
+.workspace-hero h1 {
+  font-size: clamp(2rem, 4vw, 3.75rem);
+  max-width: 18ch;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.055em;
+}
+.workspace-stats {
+  gap: 0;
+  border: 1.5px solid #000;
+}
+.workspace-stats .card {
+  border: 0;
+}
+.workspace-stats .card + .card {
+  border-left: 1.5px solid #000;
+}
+.stat-number,
+.numeric-cell,
+label,
+.status-badge,
+.eyebrow,
+.table-head,
+.chip,
+.workspace-stats .text-sm,
+.workspace-nav,
+.workspace-hero > .text-right {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.stat-number {
+  font-size: 2.75rem;
+}
+label,
+.eyebrow,
+.table-head,
+.workspace-stats .text-sm {
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+}
+label :is(input, select, textarea) {
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.workspace-nav {
+  gap: 0;
+  border: 1.5px solid #000;
+  width: fit-content;
+  max-width: 100%;
+}
+.workspace-nav .tab {
+  padding: 0.875rem 1.25rem;
+  border: 0;
+  color: #000;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.workspace-nav .tab + .tab {
+  border-left: 1.5px solid #000;
+}
+.workspace-nav .tab-active,
+.workspace-nav .tab-active:hover {
+  background: #000;
+  color: #fff;
+}
+.workspace-nav .tab span {
+  background: transparent;
+  color: inherit;
+}
+.status-badge {
+  background: #fff;
+  border: 1.5px solid #000;
+  color: #000;
+  text-transform: uppercase;
+  font-size: 0.625rem;
+  padding: 0.375rem 0.5rem;
+}
+.status-badge > span {
+  display: none;
+}
+.chip {
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+}
+.primary-button {
+  border: 1.5px solid #000;
+  background: #000;
+}
+.application-row:hover {
+  background: #f5f5f5;
+}
+.company-icon {
+  background: #fff;
+  font-family: ui-monospace, monospace;
+}
+.application-row td:first-child button {
+  font-size: 1rem;
+}
+@media (max-width: 639px) {
+  .workspace-stats .card + .card {
+    border-left: 0;
+    border-top: 1.5px solid #000;
+  }
+  .workspace-nav .tab {
+    padding: 0.75rem 0.625rem;
+    font-size: 0.6875rem;
+  }
+}
