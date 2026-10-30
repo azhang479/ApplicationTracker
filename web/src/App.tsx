@@ -137,7 +137,7 @@ export function App() {
           </div>
         </div>
       </header>
-      <main className="max-w-[1440px] mx-auto px-6 md:px-10 py-10">
+      <main className="workspace-main max-w-[1440px] mx-auto px-6 md:px-10 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
             <p className="eyebrow mb-3">YOUR CAREER, IN MOTION</p>
@@ -157,7 +157,7 @@ export function App() {
             </div>
           </div>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4 mb-9">
+        <div className="workspace-stats grid sm:grid-cols-3 gap-4 mb-9">
           {[
             ['Applications tracked', apps.length, 'Every opportunity, organized.'],
             ['Active applications', active, 'Good things are in the works.'],
@@ -175,7 +175,7 @@ export function App() {
             </div>
           ))}
         </div>
-        <nav className="flex gap-7 border-b mb-7" aria-label="Workspace tabs">
+        <nav className="workspace-nav flex gap-7 border-b mb-7" aria-label="Workspace tabs">
           {['Applications', 'Needs review', 'Settings'].map((name) => (
             <button
               key={name}
