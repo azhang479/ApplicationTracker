@@ -186,7 +186,7 @@ export class GmailService {
               reviews.some((r) => r.id === id)
             )
               return;
-            await this.tracker.receive(email, result);
+            await this.tracker.receive(email, result, text.slice(0, EMAIL_TEXT_LIMIT));
           });
         }
       }

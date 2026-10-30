@@ -84,11 +84,11 @@ export class Tracker {
       return app;
     });
   }
-  async receive(email: Email, classification: Classification) {
+  async receive(email: Email, classification: Classification, body = '') {
     const { confident, candidates } = matchApplications(
       await this.store.listApplications(),
       classification,
-      email.from,
+      [email.from, email.subject, email.snippet, body].join('\n'),
     );
     if (!confident) {
       await this.store.saveReview({

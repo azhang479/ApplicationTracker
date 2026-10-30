@@ -28,6 +28,7 @@ function setup(
     markProcessed: vi.fn(),
   } as unknown as Store;
   const classify = vi.fn().mockResolvedValue({ isJobRelated: false });
+  const receive = vi.fn();
   const service = new GmailService(
     {
       OWNER_EMAIL: ownerEmail,
@@ -37,9 +38,9 @@ function setup(
     } as Config,
     store,
     { classify } as unknown as AI,
-    {} as Tracker,
+    { receive } as unknown as Tracker,
   );
-  return { service, history, list, get, store, classify, saveGmail, saved: () => saved };
+  return { service, history, list, get, store, classify, receive, saveGmail, saved: () => saved };
 }
 const notification = { emailAddress: 'owner@gmail.com', historyId: '200' };
 beforeEach(() => vi.clearAllMocks());
@@ -157,5 +158,19 @@ describe('email classification text limit', () => {
     );
     expect(ctx.store.markProcessed).not.toHaveBeenCalled();
     expect(ctx.saveGmail).not.toHaveBeenCalled();
+  });
+  it('passes bounded body evidence beyond the snippet to application matching', async () => {
+    const text = 'Hello. '.repeat(50) + 'JPMorganChase Talent Team ' + 'x'.repeat(7000);
+    const ctx = pendingEmail(text);
+    ctx.classify.mockResolvedValue({ isJobRelated: true });
+    ctx.store.exclusive = async (work) => work();
+    ctx.store.listApplications = async () => [];
+    ctx.store.listReview = async () => [];
+    await ctx.service.processNotification(notification);
+    expect(ctx.receive).toHaveBeenCalledWith(
+      expect.objectContaining({ snippet: text.slice(0, 300) }),
+      { isJobRelated: true },
+      text.slice(0, 6000),
+    );
   });
 });

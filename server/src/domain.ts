@@ -100,11 +100,34 @@ export interface AI {
   extract(input: { url: string; pageTitle: string; text: string }): Promise<Job>;
   classify(text: string): Promise<Classification>;
 }
-export const normalize = (value: string) =>
-  value
+const companyAliases: Record<string, string> = {
+  jpmorgan: 'jpmorganchase',
+};
+export const normalize = (value: string) => {
+  const name = value
     .toLowerCase()
-    .replace(/\b(inc|llc|ltd|corp|corporation)\b/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(
+      /(?:\b(?:co|company|inc|incorporated|llc|ltd|limited|corp|corporation|group|technologies)\b\s*)+$/,
+      '',
+    )
     .replace(/[^a-z0-9]/g, '');
+  return companyAliases[name] || name;
+};
+function sameCompany(a: string, b: string) {
+  return !!a && !!b && a === b;
+}
+function companyMentions(text: string) {
+  const words = text.toLowerCase().match(/[a-z0-9]+/g) || [];
+  const mentions = new Set<string>();
+  for (let start = 0; start < words.length; start++) {
+    for (let length = 1; length <= 6 && start + length <= words.length; length++) {
+      mentions.add(normalize(words.slice(start, start + length).join(' ')));
+    }
+  }
+  return [...mentions].filter(Boolean);
+}
 export function titleSimilarity(a: string, b: string) {
   const tokens = (s: string) => new Set(s.toLowerCase().match(/[a-z0-9]+/g) || []);
   const x = tokens(a),
@@ -116,17 +139,19 @@ export function matchApplications(apps: Application[], result: Classification, s
   const available = apps.filter((a) => a.status !== 'Withdrawn');
   const exact = result.jobId ? available.filter((a) => a.jobId === result.jobId) : [];
   const company = normalize(result.company);
-  const senderParts = sender
-    .toLowerCase()
-    .split(/[<@>.\s]+/)
-    .map(normalize)
-    .filter(Boolean);
+  const mentions = companyMentions(sender);
   const ranked = available
     .map((app) => {
       const name = normalize(app.company);
-      const sameCompany = !!name && ((!!company && name === company) || senderParts.includes(name));
+      const companyMatch =
+        sameCompany(name, company) || mentions.some((part) => sameCompany(name, part));
       const similarity = titleSimilarity(app.title, result.title);
-      return { app, sameCompany, similarity, score: (sameCompany ? 1 : 0) + similarity };
+      return {
+        app,
+        sameCompany: companyMatch,
+        similarity,
+        score: (companyMatch ? 3 : 0) + similarity,
+      };
     })
     .sort((a, b) => b.score - a.score);
   const companyMatches = ranked.filter((r) => r.sameCompany);
@@ -136,8 +161,6 @@ export function matchApplications(apps: Application[], result: Classification, s
     confident = exact[0];
   } else if (exact.length === 0 && best) {
     if (companyMatches.length === 1) {
-      confident = best.app;
-    } else if (best.similarity >= 0.6 && best.similarity - companyMatches[1].similarity >= 0.2) {
       confident = best.app;
     }
   }
@@ -161,6 +184,6 @@ export function categoryStatus(category: Classification['category']): Status | u
   return mapping[category];
 }
 export const passesPrefilter = (text: string) =>
-  /\b(application|applying|applied|candidacy|candidate|interview|assessment|position|role|recruit\w*|offer|unfortunately|move forward|next steps|hiring)\b/i.test(
+  /\b(applications?|applying|applied|candidacy|candidates?|interviews?|assessments?|position|role|recruit\w*|offers?|unfortunately|move forward|moving forward|next steps|hiring|thank you for your interest|talent|hackerrank|codesignal|coding[\s-]+challenges?|scheduling|schedule[ds]?|screens?|screening|phone[\s-]+screens?|opportunit(?:y|ies)|careers?|regret|not selected|decided|offer[\s-]+letter|background[\s-]+checks?|onboarding)\b/i.test(
     text,
   );

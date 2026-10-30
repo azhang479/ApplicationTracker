@@ -8,6 +8,7 @@ import {
   Classification,
   AI,
   matchApplications,
+  normalize,
   titleSimilarity,
   categoryStatus,
   passesPrefilter,
@@ -154,10 +155,12 @@ describe('matching', () => {
     ).toBeUndefined();
     expect(matchApplications([], result, '').candidates).toEqual([]);
   });
-  it('requires clear title winner and rejects ambiguous exact IDs', async () => {
+  it('ranks the title winner but reviews multiple company matches and ambiguous exact IDs', async () => {
     const app = await setup().capture();
     const other = { ...app, id: 'other', jobId: '456', title: 'Product Designer' };
-    expect(matchApplications([app, other], result, '').confident?.id).toBe(app.id);
+    const match = matchApplications([app, other], result, '');
+    expect(match.candidates[0].applicationId).toBe(app.id);
+    expect(match.confident).toBeUndefined();
     expect(
       matchApplications([app, { ...other, title: app.title }], result, '').confident,
     ).toBeUndefined();
@@ -166,6 +169,126 @@ describe('matching', () => {
         .confident,
     ).toBeUndefined();
   });
+  it.each([
+    ['JPMorganChase', 'JPMorgan Chase & Co.'],
+    ['JPMorgan', 'JPMorgan Chase & Co.'],
+    ['ACME', 'Acme Co., Inc.'],
+    ['Acme', 'Acme LLC'],
+    ['Acme', 'Acme Corp.'],
+    ['Acme', 'Acme Ltd.'],
+    ['Acme', 'Acme Group'],
+    ['Acme', 'Acme Technologies'],
+    ['A&B', 'a b'],
+    ['Acme-Works', 'ACME Works'],
+  ])('normalizes %s and %s to the same company', async (a, b) => {
+    expect(normalize(a)).toBe(normalize(b));
+    const app = { ...(await setup().capture()), company: a };
+    expect(matchApplications([app], { ...result, company: b }, '').confident?.id).toBe(app.id);
+  });
+  it('does not strip suffix words inside a company name or use arbitrary prefixes', async () => {
+    expect(normalize('Group One')).not.toBe(normalize('One'));
+    const app = { ...(await setup().capture()), company: 'Acme Technologies' };
+    expect(
+      matchApplications([app], { ...result, company: 'Acmeology' }, '').confident,
+    ).toBeUndefined();
+    expect(
+      matchApplications([app], { ...result, company: '' }, 'xacme@example.com').confident,
+    ).toBeUndefined();
+  });
+  it('ranks the JPMorgan assessment above generic graduate engineering titles', async () => {
+    const base = await setup().capture();
+    const apps = [
+      {
+        ...base,
+        id: 'glean',
+        company: 'Glean',
+        title: 'Software Engineer, University Grad',
+        jobId: '',
+      },
+      {
+        ...base,
+        id: 'jpmorgan',
+        company: 'JPMorgan Chase & Co.',
+        title: '2027 Software Engineer Program - Full-Time - United States - July Start',
+        jobId: '',
+      },
+      {
+        ...base,
+        id: 'adobe',
+        company: 'Adobe',
+        title: '2027 University Graduate - Software Engineer',
+        jobId: '',
+      },
+    ];
+    const evidence =
+      'HackerRank <no-reply@hackerrank.com>\nJPMorganChase – NAMR Software Engineer Program – Campus Hiring – 2027\nYour JPMorganChase position. HackerRank on behalf of the JPMorganChase Talent Team.';
+    for (const company of ['JPMorganChase', 'JPMorgan', 'HackerRank', '']) {
+      const match = matchApplications(
+        apps,
+        { ...result, company, title: 'Software Engineer Program', category: 'online_assessment' },
+        evidence,
+      );
+      expect(match.confident?.id).toBe('jpmorgan');
+      expect(match.candidates.map((c) => c.applicationId)).toEqual(['jpmorgan', 'glean', 'adobe']);
+      expect(match.candidates[0].score).toBeCloseTo(3.3);
+      expect(match.candidates[1].score).toBeCloseTo(0.4);
+      expect(match.candidates[2].score).toBeCloseTo(1 / 3);
+      expect(match.candidates[0].score - match.candidates[1].score).toBeGreaterThan(2);
+    }
+  });
+  it('never auto-matches a different company on similar title words', async () => {
+    const app = await setup().capture();
+    const match = matchApplications(
+      [app],
+      { ...result, company: 'Glean', title: app.title },
+      'jobs@glean.com',
+    );
+    expect(match.confident).toBeUndefined();
+    expect(match.candidates[0].score).toBe(1);
+  });
+  it('reviews conflicting company evidence even with a perfect title', async () => {
+    const app = await setup().capture();
+    const other = { ...app, id: 'other', company: 'Glean', jobId: '' };
+    const match = matchApplications([app, other], result, 'Glean position');
+    expect(match.confident).toBeUndefined();
+  });
+  it('reviews clearly different roles when there are multiple applications at the company', async () => {
+    const app = await setup().capture();
+    const match = matchApplications(
+      [app, { ...app, id: 'other', title: 'Accountant', jobId: '' }],
+      { ...result, title: 'Product Designer' },
+      '',
+    );
+    expect(match.confident).toBeUndefined();
+  });
+  it.each(['subject', 'sender', 'body'] as const)(
+    'uses company evidence from the email %s through receive',
+    async (source) => {
+      const ctx = setup();
+      const app = await ctx.capture();
+      app.company = 'JPMorgan Chase & Co.';
+      await ctx.store.saveApplication(app);
+      const notice = {
+        ...email,
+        from: 'HackerRank <jobs@hackerrank.com>',
+        subject: 'Your next steps',
+        snippet: '',
+      };
+      let body = '';
+      if (source === 'subject')
+        notice.subject = 'JPMorganChase – NAMR Software Engineer Program – Campus Hiring – 2027';
+      if (source === 'sender') notice.from = 'JPMorganChase <jobs@workday.com>';
+      if (source === 'body')
+        body = 'Welcome. '.repeat(50) + 'HackerRank on behalf of the JPMorganChase Talent Team';
+      await ctx.tracker.receive(
+        notice,
+        { ...result, company: 'HackerRank', category: 'online_assessment' },
+        body,
+      );
+      expect(ctx.store.reviews).toEqual([]);
+      expect(ctx.store.apps[0].status).toBe('Online Assessment');
+    },
+  );
 });
 describe('status and ghosting', () => {
   it.each([
@@ -281,11 +404,35 @@ describe('MIME and prefilter', () => {
     'move forward',
     'next steps',
     'hiring',
+    'Thank you for your interest',
+    'Talent team',
+    'HackerRank',
+    'CodeSignal',
+    'coding challenge',
+    'coding-challenges',
+    'assessments',
+    'schedule',
+    'scheduled',
+    'scheduling',
+    'screen',
+    'phone screen',
+    'screening',
+    'opportunity',
+    'opportunities',
+    'careers',
+    'regret',
+    'not selected',
+    'decided',
+    'moving forward',
+    'offer letter',
+    'background check',
+    'onboarding',
   ])('accepts %s', (text) => expect(passesPrefilter(text)).toBe(true));
   it('rejects unrelated or empty messages', () => {
     expect(passesPrefilter('')).toBe(false);
     expect(passesPrefilter('Dinner tomorrow?')).toBe(false);
     expect(passesPrefilter('roleplay')).toBe(false);
+    expect(passesPrefilter('sunscreen, talented actors, and screenplays')).toBe(false);
   });
 });
 describe('authentication', () => {
