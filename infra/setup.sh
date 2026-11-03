@@ -136,7 +136,7 @@ fi
 "${GCLOUD[@]}" run deploy "$SERVICE" --source=. --region="$REGION" \
   --service-account="$RUNTIME" \
   --build-service-account="projects/$PROJECT_ID/serviceAccounts/$BUILDER" \
-  --allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --timeout=300s \
+  --allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --timeout=900s \
   --update-env-vars="^|^GOOGLE_CLOUD_PROJECT=$PROJECT_ID|GCP_LOCATION=$REGION|GEMINI_LOCATION=$GEMINI_LOCATION|OWNER_EMAIL=$OWNER_EMAIL|OAUTH_CLIENT_ID=$CLIENT_ID|PUBLIC_URL=$PUBLIC_URL|PUBSUB_TOPIC=$TOPIC|PUSH_SERVICE_ACCOUNT=$INVOKER|GEMINI_MODEL=$GEMINI_MODEL|GHOSTED_AFTER_DAYS=45" \
   --update-secrets="EXTENSION_API_KEY=$KEY_SECRET:$KEY_VERSION,OAUTH_CLIENT_SECRET=$OAUTH_SECRET:$OAUTH_VERSION"
 URL="$("${GCLOUD[@]}" run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"

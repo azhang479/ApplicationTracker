@@ -86,6 +86,16 @@ export function createApp(
       res.json({ connected: !!data?.refreshToken, watchExpiration: data?.watchExpiration || null });
     }),
   );
+  app.post(
+    '/api/gmail/recheck',
+    wrap(async (req, res) => {
+      const { days } = z
+        .object({ days: z.number().int().min(1).max(90) })
+        .strict()
+        .parse(req.body);
+      res.json(await gmail.recheck(days));
+    }),
+  );
   app.post('/api/gmail/connect', (_req, res) => {
     const state = signState(config.OAUTH_CLIENT_SECRET);
     res.cookie('gmail_state', state, {

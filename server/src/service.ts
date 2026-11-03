@@ -9,6 +9,8 @@ import {
   Store,
   Status,
   emailStatus,
+  emailEventTime,
+  matchesEmail,
   jobSchema,
   matchApplications,
   normalize,
@@ -31,6 +33,7 @@ export const resolveSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('dismiss') }),
 ]);
 export class NotFound extends Error {}
+export type EmailOutcome = 'updated' | 'review' | 'skipped';
 export class Tracker {
   constructor(
     public store: Store,
@@ -85,7 +88,42 @@ export class Tracker {
       return app;
     });
   }
-  async receive(email: Email, classification: Classification, body = '') {
+  async recheckEmail(
+    email: Email,
+    classification: Classification,
+    body = '',
+  ): Promise<EmailOutcome> {
+    const apps = await this.store.listApplications();
+    if ((await this.store.listReview()).some((review) => review.id === email.id)) return 'skipped';
+    const existing = apps.find((app) => app.events.some((event) => matchesEmail(event, email)));
+    if (existing) {
+      const latest = existing.events
+        .filter((event) => event.gmailLink)
+        .reduce<(typeof existing.events)[number] | undefined>(
+          (newest, event) =>
+            !newest || emailEventTime(event) >= emailEventTime(newest) ? event : newest,
+          undefined,
+        );
+      let changed = false;
+      for (const event of existing.events.filter((event) => matchesEmail(event, email))) {
+        if (event.type === classification.category) continue;
+        event.type = classification.category;
+        if (event === latest) {
+          existing.status = emailStatus(existing.status, classification.category);
+          event.status = existing.status;
+        } else {
+          event.status = emailStatus(event.status || 'Applied', classification.category);
+        }
+        changed = true;
+      }
+      if (!changed) return 'skipped';
+      existing.updatedAt = this.now();
+      await this.store.saveApplication(existing);
+      return 'updated';
+    }
+    return this.receive(email, classification, body);
+  }
+  async receive(email: Email, classification: Classification, body = ''): Promise<EmailOutcome> {
     const { confident, candidates } = matchApplications(
       await this.store.listApplications(),
       classification,
@@ -100,9 +138,10 @@ export class Tracker {
         createdAt: this.now(),
         resolved: false,
       });
-      return;
+      return 'review';
     }
     await this.applyEmail(confident, email, classification);
+    return 'updated';
   }
   private async applyEmail(
     app: Application,

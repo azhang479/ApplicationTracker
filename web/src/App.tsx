@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SignIn } from './auth';
 import { Drawer } from './Drawer';
 import { AssessmentEmailLink } from './AssessmentEmailLink';
+import { EmailRecheck, type RecheckCounts } from './EmailRecheck';
 import { ReviewCard } from './ReviewCard';
 import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
@@ -471,6 +472,14 @@ export function App() {
               <br />
               The connection is renewed automatically each day.
             </p>
+            <EmailRecheck
+              connected={gmail.connected}
+              run={async (days) => {
+                const result = await api<RecheckCounts>('/api/gmail/recheck', 'POST', { days });
+                await refresh();
+                return result;
+              }}
+            />
           </section>
         )}
         <footer className="mt-12 pt-5 border-t text-xs text-slate-400 flex justify-between">

@@ -170,6 +170,7 @@ class SetupTests(unittest.TestCase):
         self.assertFalse(first.get('subscription'))
         self.assertFalse(first.get('job'))
         self.assertEqual(first['env']['PUBLIC_URL'], URL)
+        self.assertIn('--timeout=900s', self.calls('run', 'deploy')[-1])
         self.run_setup()
         self.assertEqual(first['secrets'], self.state()['secrets'])
         self.run_setup(oauth=True)

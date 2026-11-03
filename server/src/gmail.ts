@@ -1,10 +1,18 @@
 import { gmail, gmail_v1 } from 'googleapis/build/src/apis/gmail/index.js';
 import { OAuth2Client } from 'google-auth-library';
-import { AI, Email, Store, passesPrefilter } from './domain.js';
+import { AI, Email, Store, passesPrefilter, matchesEmail } from './domain.js';
 import { Config } from './config.js';
-import { Tracker } from './service.js';
+import { Tracker, type EmailOutcome } from './service.js';
 
 const EMAIL_TEXT_LIMIT = 6_000;
+const RECHECK_CONCURRENCY = 4;
+export type RecheckCounts = {
+  scanned: number;
+  classified: number;
+  updated: number;
+  review: number;
+  skipped: number;
+};
 
 export function parseMime(part: gmail_v1.Schema$MessagePart): string {
   const plain: string[] = [];
@@ -94,6 +102,109 @@ export class GmailService {
     await this.store.saveGmail({ refreshToken });
     await this.renew();
   }
+  private async processMessage(
+    client: gmail_v1.Gmail,
+    id: string,
+    recheck = false,
+  ): Promise<{ classified: number; outcome: EmailOutcome }> {
+    const skipped = { classified: 0, outcome: 'skipped' as const };
+    if (!recheck && (await this.store.isProcessed(id))) return skipped;
+    const identity = { id, gmailLink: 'https://mail.google.com/mail/u/0/#all/' + id };
+    let onTimeline = false;
+    if (recheck) {
+      const known = await this.store.exclusive(async () => ({
+        inReview: (await this.store.listReview()).some((review) => review.id === id),
+        onTimeline: (await this.store.listApplications()).some((app) =>
+          app.events.some((event) => matchesEmail(event, identity)),
+        ),
+      }));
+      if (known.inReview) {
+        await this.store.markProcessed(id);
+        return skipped;
+      }
+      onTimeline = known.onTimeline;
+    }
+    let message: gmail_v1.Schema$Message;
+    try {
+      message = (await client.users.messages.get({ userId: 'me', id, format: 'full' })).data;
+    } catch (error) {
+      if ((error as { code?: number }).code !== 404) throw error;
+      await this.store.markProcessed(id);
+      return skipped;
+    }
+    const header = (name: string) =>
+      message.payload?.headers?.find((h) => h.name?.toLowerCase() === name)?.value || '';
+    const text = parseMime(message.payload || {});
+    const email: Email = {
+      ...identity,
+      subject: header('subject'),
+      from: header('from'),
+      date: header('date'),
+      snippet: text.slice(0, 300),
+    };
+    let classified = 0;
+    let outcome: EmailOutcome = 'skipped';
+    if (onTimeline || passesPrefilter(email.subject + ' ' + text)) {
+      const body = text.slice(0, EMAIL_TEXT_LIMIT);
+      const result = await this.ai.classify(
+        JSON.stringify({ subject: email.subject, from: email.from, text: body }),
+      );
+      classified = 1;
+      if (result.isJobRelated) {
+        outcome = await this.store.exclusive(async () => {
+          if (recheck) return this.tracker.recheckEmail(email, result, body);
+          const apps = await this.store.listApplications();
+          const reviews = await this.store.listReview();
+          if (
+            apps.some((app) => app.events.some((event) => matchesEmail(event, email))) ||
+            reviews.some((review) => review.id === id)
+          )
+            return 'skipped';
+          return this.tracker.receive(email, result, body);
+        });
+      }
+    }
+    await this.store.markProcessed(id);
+    return { classified, outcome };
+  }
+  async recheck(days: number): Promise<RecheckCounts> {
+    const client = await this.client();
+    const after = Math.floor(Date.now() / 1000) - days * 86400;
+    const ids = new Set<string>();
+    let pageToken: string | undefined;
+    do {
+      const { data }: { data: gmail_v1.Schema$ListMessagesResponse } =
+        await client.users.messages.list({
+          userId: 'me',
+          q: 'in:inbox after:' + after,
+          maxResults: 500,
+          pageToken,
+        });
+      for (const message of data.messages || []) if (message.id) ids.add(message.id);
+      pageToken = data.nextPageToken || undefined;
+    } while (pageToken);
+    const counts: RecheckCounts = {
+      scanned: ids.size,
+      classified: 0,
+      updated: 0,
+      review: 0,
+      skipped: 0,
+    };
+    const messages = [...ids];
+    for (let start = 0; start < messages.length; start += RECHECK_CONCURRENCY) {
+      const results = await Promise.allSettled(
+        messages
+          .slice(start, start + RECHECK_CONCURRENCY)
+          .map((id) => this.processMessage(client, id, true)),
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') throw result.reason;
+        counts.classified += result.value.classified;
+        counts[result.value.outcome]++;
+      }
+    }
+    return counts;
+  }
   async processNotification(notification: { emailAddress: string; historyId: string }) {
     if (notification.emailAddress.toLowerCase() !== this.config.OWNER_EMAIL.toLowerCase()) return;
     const config = await this.store.getGmail();
@@ -147,50 +258,7 @@ export class GmailService {
       newest = notification.historyId;
     }
     for (const id of ids) {
-      if (await this.store.isProcessed(id)) continue;
-      let message: gmail_v1.Schema$Message;
-      try {
-        message = (await client.users.messages.get({ userId: 'me', id, format: 'full' })).data;
-      } catch (error) {
-        if ((error as { code?: number }).code === 404) {
-          await this.store.markProcessed(id);
-          continue;
-        }
-        throw error;
-      }
-      const header = (name: string) =>
-        message.payload?.headers?.find((h) => h.name?.toLowerCase() === name)?.value || '';
-      const text = parseMime(message.payload || {});
-      const email: Email = {
-        id,
-        subject: header('subject'),
-        from: header('from'),
-        date: header('date'),
-        snippet: text.slice(0, 300),
-        gmailLink: 'https://mail.google.com/mail/u/0/#all/' + id,
-      };
-      if (passesPrefilter(email.subject + ' ' + text)) {
-        const result = await this.ai.classify(
-          JSON.stringify({
-            subject: email.subject,
-            from: email.from,
-            text: text.slice(0, EMAIL_TEXT_LIMIT),
-          }),
-        );
-        if (result.isJobRelated) {
-          await this.store.exclusive(async () => {
-            const apps = await this.store.listApplications();
-            const reviews = await this.store.listReview();
-            if (
-              apps.some((a) => a.events.some((e) => e.gmailLink === email.gmailLink)) ||
-              reviews.some((r) => r.id === id)
-            )
-              return;
-            await this.tracker.receive(email, result, text.slice(0, EMAIL_TEXT_LIMIT));
-          });
-        }
-      }
-      await this.store.markProcessed(id);
+      await this.processMessage(client, id);
     }
     const latest = await this.store.getGmail();
     if (latest) await this.store.saveGmail({ ...latest, historyId: newest, lastSyncAt: syncedAt });

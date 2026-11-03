@@ -23,19 +23,21 @@ const input = {
 let server: Server;
 const capture = vi.fn();
 const processNotification = vi.fn();
+const recheck = vi.fn();
 let log: ReturnType<typeof vi.spyOn>;
 let base: string;
 beforeEach(async () => {
   capture.mockReset();
   processNotification.mockReset();
+  recheck.mockReset();
   log = vi.spyOn(console, 'error').mockImplementation(() => {});
   const app = createApp(
     config,
     { capture } as unknown as Tracker,
-    { processNotification } as unknown as GmailService,
+    { processNotification, recheck } as unknown as GmailService,
     {
-      verify: async () => ({
-        email: config.PUSH_SERVICE_ACCOUNT,
+      verify: async (token) => ({
+        email: token === 'owner-token' ? config.OWNER_EMAIL : config.PUSH_SERVICE_ACCOUNT,
         email_verified: true,
         iss: 'accounts.google.com',
       }),
@@ -66,6 +68,48 @@ async function post(body: unknown, path = '/api/capture') {
 function logged() {
   return JSON.parse(log.mock.calls[0][0] as string);
 }
+describe('authenticated Gmail recheck endpoint', () => {
+  async function request(body: unknown, token = 'owner-token') {
+    return fetch(base + '/api/gmail/recheck', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+  }
+  it.each([1, 7, 90])('accepts %s days and returns service counts', async (days) => {
+    const counts = { scanned: 312, classified: 10, updated: 3, review: 2, skipped: 307 };
+    recheck.mockResolvedValue(counts);
+    const response = await request({ days });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(counts);
+    expect(recheck).toHaveBeenCalledWith(days);
+  });
+  it.each([
+    {},
+    { days: 0 },
+    { days: 91 },
+    { days: 1.5 },
+    { days: '7' },
+    { days: null },
+    { days: -1 },
+  ])('rejects invalid days %j', async (body) => {
+    expect((await request(body)).status).toBe(400);
+    expect(recheck).not.toHaveBeenCalled();
+  });
+  it('rejects non-owner authentication', async () => {
+    expect((await request({ days: 7 }, 'push-token')).status).toBe(403);
+    expect(recheck).not.toHaveBeenCalled();
+    expect((await fetch(base + '/api/gmail/recheck', { method: 'POST' })).status).toBe(401);
+  });
+  it('logs service errors through the existing handler', async () => {
+    recheck.mockRejectedValue(new Error('Gmail unavailable'));
+    const response = await request({ days: 7 });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'Service temporarily unavailable' });
+    expect(logged().severity).toBe('ERROR');
+    expect(logged().message).toContain('Gmail unavailable');
+  });
+});
 function validationError() {
   try {
     z.object({ salaryMin: z.number() }).parse({ salaryMin: 'invalid' });
