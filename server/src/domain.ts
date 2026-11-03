@@ -71,6 +71,17 @@ export type Email = {
   snippet: string;
   gmailLink: string;
 };
+export function matchesEmail(event: Event, email: Pick<Email, 'id' | 'gmailLink'>) {
+  return (
+    !!event.gmailLink &&
+    (event.gmailLink === email.gmailLink || event.gmailLink.endsWith('/' + email.id))
+  );
+}
+export function emailEventTime(event: Event) {
+  const date = Date.parse(event.emailDate || '');
+  const at = Number.isFinite(date) ? date : Date.parse(event.at);
+  return Number.isFinite(at) ? at : -Infinity;
+}
 export type Candidate = { applicationId: string; company: string; title: string; score: number };
 export type Review = {
   id: string;

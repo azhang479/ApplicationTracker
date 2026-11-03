@@ -6,7 +6,7 @@ export function AssessmentEmailLink({ app }: { app: Application }) {
   if (!link) return null;
   return (
     <a
-      className="link text-xs block mt-2"
+      className="secondary-button assessment-email-link mt-2"
       href={link}
       target="_blank"
       rel="noreferrer"

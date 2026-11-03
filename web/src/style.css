@@ -361,6 +361,19 @@ th.table-head:has(.column-sort) {
   padding-top: 0;
   padding-bottom: 0;
 }
+.assessment-email-link {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-decoration: none;
+}
+.recheck-days input {
+  width: 5rem;
+  padding: 0.625rem 0.75rem;
+}
 @media (max-width: 479px) {
   .workspace-nav .tab {
     padding: 0.5rem 0.625rem;
