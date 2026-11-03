@@ -7,7 +7,8 @@ import {
   Email,
   Job,
   Store,
-  categoryStatus,
+  Status,
+  emailStatus,
   jobSchema,
   matchApplications,
   normalize,
@@ -103,9 +104,13 @@ export class Tracker {
     }
     await this.applyEmail(confident, email, classification);
   }
-  private async applyEmail(app: Application, email: Email, classification: Classification) {
-    const status = categoryStatus(classification.category);
-    if (status) app.status = status;
+  private async applyEmail(
+    app: Application,
+    email: Email,
+    classification: Classification,
+    statusOverride?: Status,
+  ) {
+    app.status = statusOverride ?? emailStatus(app.status, classification.category);
     if (!app.jobId && classification.jobId && classification.category === 'confirmation')
       app.jobId = classification.jobId;
     app.lastActivityAt = app.updatedAt = this.now();
@@ -130,8 +135,7 @@ export class Tracker {
           (a) => a.id === action.applicationId,
         );
         if (!app) throw new NotFound();
-        app.status = action.status;
-        await this.applyEmail(app, review.email, { ...review.classification, category: 'other' });
+        await this.applyEmail(app, review.email, review.classification, action.status);
       } else if (action.type === 'create') {
         await this.applyEmail(this.create(action.fields), review.email, review.classification);
       }

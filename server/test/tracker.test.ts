@@ -294,12 +294,80 @@ describe('status and ghosting', () => {
   it.each([
     ['rejection', 'Rejected'],
     ['online_assessment', 'Online Assessment'],
+    ['assessment_completed', 'OA Completed'],
     ['interview', 'Interview'],
     ['offer', 'Offer'],
     ['confirmation', undefined],
     ['other', undefined],
   ] as const)('maps %s', (category, status) => {
     expect(categoryStatus(category)).toBe(status);
+  });
+  it('progresses through multiple OA rounds and records every email', async () => {
+    const { tracker, capture, store } = setup();
+    await capture();
+    for (const [category, status] of [
+      ['online_assessment', 'Online Assessment'],
+      ['assessment_completed', 'OA Completed'],
+      ['online_assessment', 'Online Assessment'],
+    ] as const) {
+      await tracker.receive(email, { ...result, category });
+      expect(store.apps[0].status).toBe(status);
+      expect(store.apps[0].events.at(-1)).toMatchObject({
+        type: category,
+        status,
+        gmailLink: email.gmailLink,
+      });
+    }
+  });
+  it.each(['Interview', 'Offer', 'Rejected'] as const)(
+    'does not regress %s on OA activity but records it',
+    async (status) => {
+      const { tracker, capture, store } = setup();
+      const app = await capture();
+      await tracker.patch(app.id, { status });
+      for (const category of ['assessment_completed', 'online_assessment'] as const) {
+        await tracker.receive(email, { ...result, category });
+        expect(store.apps[0].status).toBe(status);
+        expect(store.apps[0].events.at(-1)?.type).toBe(category);
+      }
+    },
+  );
+  it.each(['OA Completed', 'Interview', 'Offer', 'Ghosted'] as const)(
+    'applies rejection from %s and does not undo it on a later offer',
+    async (status) => {
+      const { tracker, capture, store } = setup();
+      const app = await capture();
+      await tracker.patch(app.id, { status });
+      await tracker.receive(email, { ...result, category: 'rejection' });
+      expect(store.apps[0].status).toBe('Rejected');
+      await tracker.receive(email, { ...result, category: 'offer' });
+      expect(store.apps[0].status).toBe('Rejected');
+    },
+  );
+  it.each([
+    ['assessment_completed', 'OA Completed'],
+    ['online_assessment', 'Online Assessment'],
+    ['confirmation', 'Applied'],
+    ['other', 'Applied'],
+  ] as const)('revives Ghosted on %s activity', async (category, status) => {
+    const { tracker, capture, store } = setup();
+    const app = await capture();
+    await tracker.patch(app.id, { status: 'Ghosted' });
+    await tracker.receive(email, { ...result, category });
+    expect(store.apps[0].status).toBe(status);
+  });
+  it.each([
+    "You've completed your HackerRank assessment",
+    'Thank you for completing the assessment',
+    'Your CodeSignal results are ready',
+  ])('prefilters completion email: %s', (text) => {
+    expect(passesPrefilter(text)).toBe(true);
+  });
+  it('accepts OA Completed in editor and review requests', () => {
+    expect(patchSchema.parse({ status: 'OA Completed' }).status).toBe('OA Completed');
+    expect(
+      resolveSchema.parse({ type: 'apply', applicationId: 'a', status: 'OA Completed' }),
+    ).toMatchObject({ status: 'OA Completed' });
   });
   it('ghosts only stale Applied and revives on later reply', async () => {
     const { store, tracker, capture } = setup();
@@ -333,6 +401,21 @@ describe('status and ghosting', () => {
   });
 });
 describe('review resolve', () => {
+  it('retains OA invite events and links when manually applying a reviewed email', async () => {
+    const { tracker, store, capture } = setup();
+    await tracker.receive(email, { ...result, category: 'online_assessment' });
+    const app = await capture();
+    await tracker.resolve(email.id, {
+      type: 'apply',
+      applicationId: app.id,
+      status: 'Online Assessment',
+    });
+    expect(store.apps[0].events.at(-1)).toMatchObject({
+      type: 'online_assessment',
+      status: 'Online Assessment',
+      gmailLink: email.gmailLink,
+    });
+  });
   async function pending() {
     const ctx = setup();
     await ctx.tracker.receive(email, result);
