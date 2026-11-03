@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const statuses = [
   'Applied',
   'Online Assessment',
+  'OA Completed',
   'Interview',
   'Offer',
   'Rejected',
@@ -30,6 +31,7 @@ export const classificationSchema = z.object({
     'confirmation',
     'rejection',
     'online_assessment',
+    'assessment_completed',
     'interview',
     'offer',
     'other',
@@ -178,10 +180,20 @@ export function categoryStatus(category: Classification['category']): Status | u
   const mapping: Partial<Record<Classification['category'], Status>> = {
     rejection: 'Rejected',
     online_assessment: 'Online Assessment',
+    assessment_completed: 'OA Completed',
     interview: 'Interview',
     offer: 'Offer',
   };
   return mapping[category];
+}
+export function emailStatus(current: Status, category: Classification['category']): Status {
+  const next = categoryStatus(category);
+  if (current === 'Rejected' || current === 'Withdrawn') return current;
+  if (next === 'Rejected') return next;
+  if (current === 'Ghosted') return next || 'Applied';
+  if (!next) return current;
+  if (current === 'OA Completed' && next === 'Online Assessment') return next;
+  return statuses.indexOf(next) > statuses.indexOf(current) ? next : current;
 }
 export const passesPrefilter = (text: string) =>
   /\b(applications?|applying|applied|candidacy|candidates?|interviews?|assessments?|position|role|recruit\w*|offers?|unfortunately|move forward|moving forward|next steps|hiring|thank you for your interest|talent|hackerrank|codesignal|coding[\s-]+challenges?|scheduling|schedule[ds]?|screens?|screening|phone[\s-]+screens?|opportunit(?:y|ies)|careers?|regret|not selected|decided|offer[\s-]+letter|background[\s-]+checks?|onboarding)\b/i.test(

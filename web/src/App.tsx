@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SignIn } from './auth';
 import { Drawer } from './Drawer';
+import { AssessmentEmailLink } from './AssessmentEmailLink';
 import { ReviewCard } from './ReviewCard';
 import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
@@ -354,6 +355,7 @@ export function App() {
                             <span className="w-1.5 h-1.5 bg-current rounded-full" />
                             {app.status}
                           </span>
+                          {app.status === 'Online Assessment' && <AssessmentEmailLink app={app} />}
                         </td>
                         <td className="px-5 py-5 text-slate-600">
                           {salary(app)}

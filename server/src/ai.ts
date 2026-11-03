@@ -80,13 +80,13 @@ export class VertexAI implements AI {
   async classify(text: string) {
     return classificationSchema.parse(
       await this.generate(
-        'Classify a job application email. Use empty strings for unknown company, title or jobId. Do not invent identifiers.',
+        'Classify a job application email. Use assessment_completed when the candidate has already completed or submitted an assessment, such as "You have completed your HackerRank assessment" or "Thank you for completing the assessment". Use online_assessment for invitations, reminders, or new assessment rounds, not completion acknowledgements. Use empty strings for unknown company, title or jobId. Do not invent identifiers.',
         text,
         {
           isJobRelated: { type: Type.BOOLEAN },
           category: {
             ...string,
-            enum: ['confirmation', 'rejection', 'online_assessment', 'interview', 'offer', 'other'],
+            enum: classificationSchema.shape.category.options,
           },
           company: string,
           title: string,

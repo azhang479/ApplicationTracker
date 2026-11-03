@@ -3,6 +3,7 @@ export type { Application, Job, Review, Status } from '../../server/src/domain';
 export const statuses = [
   'Applied',
   'Online Assessment',
+  'OA Completed',
   'Interview',
   'Offer',
   'Rejected',
@@ -12,6 +13,7 @@ export const statuses = [
 export const statusColors: Record<string, string> = {
   Applied: 'bg-blue-50 text-blue-700 ring-blue-200',
   'Online Assessment': 'bg-amber-50 text-amber-800 ring-amber-200',
+  'OA Completed': 'bg-slate-200 text-slate-800 ring-slate-300',
   Interview: 'bg-violet-50 text-violet-700 ring-violet-200',
   Offer: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   Rejected: 'bg-rose-50 text-rose-700 ring-rose-200',
@@ -22,6 +24,7 @@ export function defaultStatus(category: string) {
   const mapping: Record<string, (typeof statuses)[number]> = {
     rejection: 'Rejected',
     online_assessment: 'Online Assessment',
+    assessment_completed: 'OA Completed',
     interview: 'Interview',
     offer: 'Offer',
   };
@@ -32,6 +35,7 @@ export const categoryName = (category: string) =>
     confirmation: 'Application confirmation',
     rejection: 'Rejection',
     online_assessment: 'Online assessment',
+    assessment_completed: 'Assessment completed',
     interview: 'Interview invitation',
     offer: 'Job offer',
     other: 'Other update',

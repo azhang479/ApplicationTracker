@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { JobFields } from './JobFields';
+import { AssessmentEmailLink } from './AssessmentEmailLink';
 import { Application, Job, Status, statuses, formatDate } from './types';
 
 export function Drawer({
@@ -104,6 +105,7 @@ export function Drawer({
               ))}
             </select>
           </label>
+          <AssessmentEmailLink app={app} />
           <JobFields value={job} onChange={setJob} />
           <div className="grid grid-cols-2 gap-4">
             <label>

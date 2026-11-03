@@ -126,3 +126,42 @@ describe('Gemini extraction', () => {
     await expect(ai.extract(input)).rejects.toThrow('Vertex unavailable');
   });
 });
+describe('Gemini assessment classification', () => {
+  it.each([
+    ["You've completed your HackerRank assessment", 'assessment_completed'],
+    ['Thank you for completing the assessment', 'assessment_completed'],
+    ['Complete your next HackerRank assessment', 'online_assessment'],
+  ])('accepts %s as %s and supplies the assessment instructions', async (text, category) => {
+    const classification = {
+      isJobRelated: true,
+      category,
+      company: 'Acme',
+      title: '',
+      jobId: '',
+      summary: text,
+    };
+    generate.mockResolvedValue({ text: JSON.stringify(classification) });
+    expect(await ai.classify(text)).toEqual(classification);
+    const request = generate.mock.calls[0][0];
+    expect(request.config.responseSchema.properties.category.enum).toContain(
+      'assessment_completed',
+    );
+    expect(request.config.systemInstruction).toContain('completed or submitted an assessment');
+    expect(request.config.systemInstruction).toContain(
+      'invitations, reminders, or new assessment rounds',
+    );
+  });
+  it('still rejects unknown categories', async () => {
+    generate.mockResolvedValue({
+      text: JSON.stringify({
+        isJobRelated: true,
+        category: 'unknown',
+        company: '',
+        title: '',
+        jobId: '',
+        summary: '',
+      }),
+    });
+    await expect(ai.classify('Assessment')).rejects.toThrow();
+  });
+});
