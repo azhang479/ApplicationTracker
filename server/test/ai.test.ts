@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VertexAI } from '../src/ai.js';
+import { resume } from './resume-fixtures.js';
 
 const { generate, clientOptions } = vi.hoisted(() => ({
   generate: vi.fn(),
@@ -35,6 +36,53 @@ const fields = {
   keyRequirements: ['TypeScript'],
 };
 const ai = new VertexAI('test-project', 'global', 'test-model');
+describe('Gemini resume tailoring', () => {
+  const input = {
+    job: {
+      company: fields.company,
+      title: fields.title,
+      jobSummary: fields.jobSummary,
+      keyRequirements: fields.keyRequirements,
+    },
+    resumes: [resume()],
+  };
+  it('uses temperature zero, structured output and conservative text-only instructions', async () => {
+    const result = {
+      resumeId: 'swe',
+      reason: 'Fit',
+      edits: [
+        {
+          find: 'Built reliable services',
+          replace: 'Developed reliable services',
+          reason: 'Keyword wording',
+        },
+      ],
+    };
+    generate.mockResolvedValue({ text: JSON.stringify(result) });
+    expect(await ai.tailor(input)).toEqual(result);
+    const request = generate.mock.calls[0][0];
+    expect(request.config.temperature).toBe(0);
+    expect(JSON.parse(request.contents)).toEqual(input);
+    expect(request.config.systemInstruction).toContain('about 15 changed words');
+    expect(request.config.systemInstruction).toContain(
+      'Never add skills, tools, employers, titles or metrics',
+    );
+    expect(request.config.systemInstruction).toContain('never LaTeX commands or formatting');
+    expect(request.config.responseSchema.required).toEqual(['resumeId', 'reason', 'edits']);
+  });
+  it('rejects malformed top-level output and preserves draft items for per-edit filtering', async () => {
+    generate.mockResolvedValue({ text: '{}' });
+    await expect(ai.tailor(input)).rejects.toThrow();
+    generate.mockResolvedValue({
+      text: JSON.stringify({
+        resumeId: 'unknown',
+        reason: 'Fit',
+        edits: [null, { find: '\\bad' }],
+      }),
+    });
+    expect((await ai.tailor(input)).edits).toHaveLength(2);
+  });
+});
 beforeEach(() => {
   generate.mockReset();
 });

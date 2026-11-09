@@ -14,6 +14,7 @@ beforeEach(() => {
     GCP_LOCATION: undefined,
     GEMINI_LOCATION: undefined,
     GEMINI_MODEL: undefined,
+    RESUME_FILENAME_PREFIX: undefined,
   };
   for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
 });
@@ -24,6 +25,13 @@ describe('Gemini configuration', () => {
     expect(config.GCP_LOCATION).toBe('us-central1');
     expect(config.GEMINI_LOCATION).toBe('global');
     expect(config.GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
+    expect(config.RESUME_FILENAME_PREFIX).toBe('Austin_Zhang_Resume');
+  });
+  it('accepts a safe resume download prefix and rejects unsafe header characters', () => {
+    vi.stubEnv('RESUME_FILENAME_PREFIX', 'Custom_Resume');
+    expect(loadConfig().RESUME_FILENAME_PREFIX).toBe('Custom_Resume');
+    vi.stubEnv('RESUME_FILENAME_PREFIX', 'Bad\r\nHeader');
+    expect(() => loadConfig()).toThrow();
   });
   it('allows independent model and location overrides', () => {
     vi.stubEnv('GCP_LOCATION', 'us-east1');

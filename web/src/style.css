@@ -374,6 +374,33 @@ th.table-head:has(.column-sort) {
   width: 5rem;
   padding: 0.625rem 0.75rem;
 }
+.resume-diff,
+.keyword-chip {
+  overflow-wrap: anywhere;
+}
+.resume-diff del,
+.resume-diff ins {
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+.keyword-covered {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.keyword-chip {
+  max-width: 100%;
+}
+.stale-edit {
+  color: var(--faint);
+  background: var(--field);
+}
+.stale-edit .resume-diff :is(del, ins) {
+  background: var(--subtle);
+  color: var(--faint);
+}
+.tailor-page pre {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 479px) {
   .workspace-nav .tab {
     padding: 0.5rem 0.625rem;

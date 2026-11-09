@@ -6,6 +6,8 @@ import { TokenVerifier, auth, sameSecret, signState, validState } from './auth.j
 import { Tracker, NotFound, patchSchema, resolveSchema } from './service.js';
 import { GmailService } from './gmail.js';
 import { logError } from './logging.js';
+import { ResumeService, ResumeError } from './resume-service.js';
+import { TectonicCompiler, CompilationError, type ResumeCompiler } from './resume-compiler.js';
 
 const wrap =
   (handler: RequestHandler): RequestHandler =>
@@ -17,8 +19,15 @@ export function createApp(
   tracker: Tracker,
   gmail: GmailService,
   verifier: TokenVerifier,
+  compiler: ResumeCompiler = new TectonicCompiler(),
 ) {
   const app = express();
+  const resumes = new ResumeService(
+    tracker.store,
+    tracker.ai,
+    compiler,
+    config.RESUME_FILENAME_PREFIX,
+  );
   function report(error: unknown, context: string, req: Request) {
     logError(error, context, [
       config.EXTENSION_API_KEY,
@@ -26,9 +35,11 @@ export function createApp(
       req.get('X-API-Key') || '',
       req.get('Authorization') || '',
       typeof req.body?.text === 'string' ? req.body.text : '',
+      typeof req.body?.tex === 'string' ? req.body.tex : '',
     ]);
   }
   app.disable('x-powered-by');
+  app.use('/api/resumes', express.json({ limit: '2mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
@@ -47,6 +58,63 @@ export function createApp(
     }),
   );
   app.use('/api', auth(config, verifier, 'owner'));
+  app.get(
+    '/api/resumes',
+    wrap(async (_req, res) => {
+      res.json(await resumes.list());
+    }),
+  );
+  app.post(
+    '/api/resumes',
+    wrap(async (req, res) => {
+      res.status(201).json(await resumes.save(req.body));
+    }),
+  );
+  app.put(
+    '/api/resumes/:id',
+    wrap(async (req, res) => {
+      res.json(await resumes.save(req.body, req.params.id));
+    }),
+  );
+  app.delete(
+    '/api/resumes/:id',
+    wrap(async (req, res) => {
+      await resumes.delete(req.params.id);
+      res.sendStatus(204);
+    }),
+  );
+  app.post(
+    '/api/applications/:id/tailor',
+    wrap(async (req, res) => {
+      res.json(await resumes.generate(req.params.id, req.body ?? {}));
+    }),
+  );
+  app.get(
+    '/api/applications/:id/tailoring',
+    wrap(async (req, res) => {
+      res.json(await resumes.view(req.params.id));
+    }),
+  );
+  app.patch(
+    '/api/applications/:id/tailoring',
+    wrap(async (req, res) => {
+      res.json(await resumes.patch(req.params.id, req.body));
+    }),
+  );
+  app.get(
+    '/api/applications/:id/resume.pdf',
+    wrap(async (req, res) => {
+      const result = await resumes.pdf(req.params.id);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${result.filename}"`,
+        'X-Page-Count': String(result.pageCount),
+        'X-Stale-Edit-Ids': JSON.stringify(result.staleEditIds),
+        'Cache-Control': 'no-store',
+      });
+      res.send(result.pdf);
+    }),
+  );
   app.get(
     '/api/applications',
     wrap(async (_req, res) => {
@@ -193,6 +261,18 @@ export function createApp(
   });
   const errors: ErrorRequestHandler = (error, req, res, _next) => {
     report(error, 'Request failed', req);
+    if (error instanceof CompilationError) {
+      res.status(422).json({ error: 'Resume compilation failed', log: error.log });
+      return;
+    }
+    if (error instanceof ResumeError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if ((error as { type?: string }).type === 'entity.too.large') {
+      res.status(413).json({ error: 'Request too large' });
+      return;
+    }
     if (error instanceof ZodError || error instanceof SyntaxError) {
       res.status(400).json({ error: 'Invalid request' });
       return;

@@ -18,8 +18,19 @@ import { parseMime } from '../src/gmail.js';
 import { auth, signState, validState } from '../src/auth.js';
 import { Config } from '../src/config.js';
 import type { Request, Response } from 'express';
+import type { Resume } from '../src/resume-domain.js';
 
 class FakeStore implements Store {
+  resumes: Resume[] = [];
+  async listResumes() {
+    return this.resumes;
+  }
+  async saveResume(resume: Resume) {
+    this.resumes = [...this.resumes.filter((item) => item.id !== resume.id), resume];
+  }
+  async deleteResume(id: string) {
+    this.resumes = this.resumes.filter((item) => item.id !== id);
+  }
   apps: Application[] = [];
   reviews: Review[] = [];
   processed = new Set<string>();
@@ -88,7 +99,11 @@ const email = {
 };
 function setup() {
   const store = new FakeStore();
-  const ai: AI = { extract: vi.fn(async () => ({ ...job })), classify: vi.fn(async () => result) };
+  const ai: AI = {
+    extract: vi.fn(async () => ({ ...job })),
+    classify: vi.fn(async () => result),
+    tailor: vi.fn(),
+  };
   const tracker = new Tracker(store, ai, () => '2026-06-01T00:00:00.000Z');
   return {
     store,
