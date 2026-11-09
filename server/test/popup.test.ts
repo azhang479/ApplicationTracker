@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+const createTab = vi.fn();
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -7,7 +8,9 @@ afterEach(() => {
 async function openPopup(
   response: { status: number; ok?: boolean; json?: () => Promise<unknown> } | Error,
   pageText = 'Page',
+  button = 'track',
 ) {
+  createTab.mockReset();
   const elements = new Map<
     string,
     {
@@ -20,6 +23,7 @@ async function openPopup(
   >();
   for (const id of [
     'track',
+    'tailor',
     'message',
     'result',
     'result-label',
@@ -47,7 +51,7 @@ async function openPopup(
     storage: {
       sync: { get: async () => ({ backendUrl: 'http://localhost:8080', apiKey: 'test-key' }) },
     },
-    tabs: { query: async () => [{ id: 1, url: 'https://example.com/job' }] },
+    tabs: { query: async () => [{ id: 1, url: 'https://example.com/job' }], create: createTab },
     scripting: {
       executeScript: async ({
         func,
@@ -63,11 +67,31 @@ async function openPopup(
   else fetch.mockResolvedValue(response);
   vi.stubGlobal('fetch', fetch);
   await import('../../extension/popup.js');
-  await elements.get('track')!.addEventListener.mock.calls[0][1]();
+  await elements.get(button)!.addEventListener.mock.calls[0][1]();
   expect(elements.get('track')!.disabled).toBe(false);
+  expect(elements.get('tailor')!.disabled).toBe(false);
   return elements;
 }
 describe('extension capture feedback', () => {
+  it.each([false, true])(
+    'opens the returned application ID for tailoring, duplicate=%s',
+    async (duplicate) => {
+      await openPopup(
+        {
+          status: 200,
+          ok: true,
+          json: async () => ({ id: 'existing/id', company: 'Acme', duplicate }),
+        },
+        'Page',
+        'tailor',
+      );
+      expect(createTab).toHaveBeenCalledWith({ url: 'http://localhost:8080/tailor/existing%2Fid' });
+    },
+  );
+  it('does not navigate when tailoring capture fails', async () => {
+    await openPopup({ status: 401, ok: false }, 'Page', 'tailor');
+    expect(createTab).not.toHaveBeenCalled();
+  });
   it.each([0, 19999, 20000, 20001, 40000])(
     'caps a %s-character page before sending it',
     async (length) => {
@@ -120,6 +144,7 @@ describe('extension capture feedback', () => {
       );
       expect(elements.get('result')!.hidden).toBe(false);
       expect(elements.get('message')!.textContent).toBe('');
+      expect(createTab).not.toHaveBeenCalled();
     }
   });
 });

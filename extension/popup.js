@@ -3,13 +3,15 @@ import { settings, salary } from './shared.js';
 const JOB_TEXT_LIMIT = 20_000;
 
 const track = document.getElementById('track');
+const tailor = document.getElementById('tailor');
 const message = document.getElementById('message');
 function showError(error) {
   message.className = 'error';
   message.textContent = error.message || 'Something went wrong. Please try again.';
 }
-track.addEventListener('click', async () => {
+async function capture(openTailor = false) {
   track.disabled = true;
+  tailor.disabled = true;
   document.getElementById('result').hidden = true;
   message.className = '';
   message.textContent = 'Extracting… (can take ~10s)';
@@ -53,12 +55,17 @@ track.addEventListener('click', async () => {
     document.getElementById('title').textContent = job.title;
     document.getElementById('salary').textContent = salary(job);
     document.getElementById('result').hidden = false;
+    if (openTailor)
+      await chrome.tabs.create({ url: config.url + '/tailor/' + encodeURIComponent(job.id) });
   } catch (error) {
     showError(error);
   } finally {
     track.disabled = false;
+    tailor.disabled = false;
   }
-});
+}
+track.addEventListener('click', () => capture());
+tailor.addEventListener('click', () => capture(true));
 document.getElementById('dashboard').addEventListener('click', async () => {
   try {
     const config = await settings();

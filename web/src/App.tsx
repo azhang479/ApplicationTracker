@@ -4,6 +4,8 @@ import { Drawer } from './Drawer';
 import { AssessmentEmailLink } from './AssessmentEmailLink';
 import { EmailRecheck, type RecheckCounts } from './EmailRecheck';
 import { ReviewCard } from './ReviewCard';
+import { Resumes } from './Resumes';
+import { Tailor } from './Tailor';
 import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
   Application,
@@ -26,7 +28,9 @@ const sortColumns: { key: SortKey; label: string }[] = [
 ];
 export function App() {
   const [token, setToken] = useState(() => sessionStorage.getItem('idToken') || '');
-  const [tab, setTab] = useState('Applications');
+  const [tab, setTab] = useState(() =>
+    new URLSearchParams(location.search).get('tab') === 'settings' ? 'Settings' : 'Applications',
+  );
   const [apps, setApps] = useState<Application[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [gmail, setGmail] = useState<GmailStatus>({ connected: false, watchExpiration: null });
@@ -65,7 +69,10 @@ export function App() {
         throw new Error(
           'This account does not have access. Please sign out and use the owner’s Google account.',
         );
-      if (!response.ok) throw new Error('We couldn’t complete that request. Please try again.');
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw new Error(failure.error || 'We couldn’t complete that request. Please try again.');
+      }
       if (response.status === 204) return undefined as T;
       return response.json() as Promise<T>;
     },
@@ -82,7 +89,7 @@ export function App() {
     setGmail(status);
   }, [api]);
   useEffect(() => {
-    if (!token) return;
+    if (!token || location.pathname.startsWith('/tailor/')) return;
     let active = true;
     setLoading(true);
     setError('');
@@ -119,6 +126,11 @@ export function App() {
     setSortDirection(direction);
   }
   if (!token) return <SignIn onToken={onToken} />;
+  const tailorPath = location.pathname.match(/^\/tailor\/([^/]+)\/?$/);
+  if (tailorPath)
+    return (
+      <Tailor id={decodeURIComponent(tailorPath[1])} api={api} token={token} signOut={signOut} />
+    );
   const visible = sortApplications(
     apps.filter(
       (app) =>
@@ -419,68 +431,71 @@ export function App() {
           </section>
         )}
         {!loading && tab === 'Settings' && (
-          <section className="card max-w-2xl p-7">
-            <div className="flex gap-4">
-              <span className="company-icon">✉</span>
-              <div>
-                <h2 className="font-semibold text-lg">Your Gmail connection</h2>
-                <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-                  Let application updates come to you. We look for job-related messages and keep
-                  your applications up to date.
-                </p>
+          <>
+            <section className="card max-w-2xl p-7">
+              <div className="flex gap-4">
+                <span className="company-icon">✉</span>
+                <div>
+                  <h2 className="font-semibold text-lg">Your Gmail connection</h2>
+                  <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+                    Let application updates come to you. We look for job-related messages and keep
+                    your applications up to date.
+                  </p>
+                </div>
               </div>
-            </div>
-            <dl className="mt-7 border-y divide-y">
-              <div className="flex justify-between py-4 text-sm">
-                <dt className="text-slate-500">Connection</dt>
-                <dd className={gmail.connected ? 'text-emerald-700' : 'text-slate-500'}>
-                  {gmail.connected ? '● Connected' : 'Not connected'}
-                </dd>
-              </div>
-              <div className="flex justify-between py-4 text-sm">
-                <dt className="text-slate-500">Email watch expires</dt>
-                <dd>
-                  {gmail.watchExpiration
-                    ? formatDate(new Date(Number(gmail.watchExpiration)).toISOString())
-                    : 'Not set'}
-                </dd>
-              </div>
-            </dl>
-            <button
-              className="primary-button mt-6"
-              disabled={connecting}
-              onClick={async () => {
-                setConnecting(true);
-                setError('');
-                try {
-                  const data = await api<{ url: string }>('/api/gmail/connect', 'POST');
-                  window.location.assign(data.url);
-                } catch (e) {
-                  setError((e as Error).message);
-                  setConnecting(false);
-                }
-              }}
-            >
-              {connecting
-                ? 'Opening Google…'
-                : gmail.connected
-                  ? 'Reconnect Gmail'
-                  : 'Connect Gmail'}
-            </button>
-            <p className="text-xs text-slate-400 mt-5 leading-relaxed">
-              Read-only access. We never send email or store full email bodies.
-              <br />
-              The connection is renewed automatically each day.
-            </p>
-            <EmailRecheck
-              connected={gmail.connected}
-              run={async (days) => {
-                const result = await api<RecheckCounts>('/api/gmail/recheck', 'POST', { days });
-                await refresh();
-                return result;
-              }}
-            />
-          </section>
+              <dl className="mt-7 border-y divide-y">
+                <div className="flex justify-between py-4 text-sm">
+                  <dt className="text-slate-500">Connection</dt>
+                  <dd className={gmail.connected ? 'text-emerald-700' : 'text-slate-500'}>
+                    {gmail.connected ? '● Connected' : 'Not connected'}
+                  </dd>
+                </div>
+                <div className="flex justify-between py-4 text-sm">
+                  <dt className="text-slate-500">Email watch expires</dt>
+                  <dd>
+                    {gmail.watchExpiration
+                      ? formatDate(new Date(Number(gmail.watchExpiration)).toISOString())
+                      : 'Not set'}
+                  </dd>
+                </div>
+              </dl>
+              <button
+                className="primary-button mt-6"
+                disabled={connecting}
+                onClick={async () => {
+                  setConnecting(true);
+                  setError('');
+                  try {
+                    const data = await api<{ url: string }>('/api/gmail/connect', 'POST');
+                    window.location.assign(data.url);
+                  } catch (e) {
+                    setError((e as Error).message);
+                    setConnecting(false);
+                  }
+                }}
+              >
+                {connecting
+                  ? 'Opening Google…'
+                  : gmail.connected
+                    ? 'Reconnect Gmail'
+                    : 'Connect Gmail'}
+              </button>
+              <p className="text-xs text-slate-400 mt-5 leading-relaxed">
+                Read-only access. We never send email or store full email bodies.
+                <br />
+                The connection is renewed automatically each day.
+              </p>
+              <EmailRecheck
+                connected={gmail.connected}
+                run={async (days) => {
+                  const result = await api<RecheckCounts>('/api/gmail/recheck', 'POST', { days });
+                  await refresh();
+                  return result;
+                }}
+              />
+            </section>
+            <Resumes api={api} />
+          </>
         )}
         <footer className="mt-12 pt-5 border-t text-xs text-slate-400 flex justify-between">
           <span>Made for your next opportunity.</span>

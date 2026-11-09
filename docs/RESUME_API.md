@@ -1,7 +1,10 @@
 # Resume tailoring backend
 
-All routes require the dashboard owner's Google bearer token. No extension routes
-or UI are included yet. Resumes and edit decisions live in Firestore; PDFs do not.
+All routes below require the dashboard owner's Google bearer token. Manage the
+library in Settings, then use “Tailor resume” in an application's drawer or
+“Track & tailor resume” in the Chrome popup. The `/tailor/:applicationId` page
+keeps its URL through sign-in, saves edit decisions, and downloads the PDF.
+Resumes and edit decisions live in Firestore; PDFs do not.
 
 ## Resume library
 

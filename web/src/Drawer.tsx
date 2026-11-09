@@ -97,6 +97,17 @@ export function Drawer({
           </button>
         </header>
         <div className="overflow-y-auto p-7 space-y-6 flex-1">
+          <div className="flex flex-wrap gap-3 items-center">
+            <a
+              className="secondary-button inline-block"
+              href={'/tailor/' + encodeURIComponent(app.id)}
+            >
+              Tailor resume ↗
+            </a>
+            {app.tailoring && (
+              <span className="text-xs text-slate-500">Tailored · {app.tailoring.resumeLabel}</span>
+            )}
+          </div>
           <label>
             Application status
             <select value={status} onChange={(e) => setStatus(e.target.value as Status)}>

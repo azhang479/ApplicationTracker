@@ -85,6 +85,9 @@ input:focus-visible {
 .actions {
   margin-top: 24px;
 }
+#tailor {
+  margin-top: 10px;
+}
 footer {
   border-top: 1px solid #e2e8f0;
   margin-top: 24px;
