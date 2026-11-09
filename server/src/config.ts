@@ -16,6 +16,12 @@ const schema = z.object({
   PUBSUB_TOPIC: z.string().min(1),
   PUSH_SERVICE_ACCOUNT: z.string().email(),
   GHOSTED_AFTER_DAYS: z.coerce.number().positive().default(45),
+  RESUME_FILENAME_PREFIX: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .default('Austin_Zhang_Resume'),
 });
 export type Config = z.infer<typeof schema>;
 export const loadConfig = () => schema.parse(process.env);

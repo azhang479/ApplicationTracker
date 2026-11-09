@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Resume, Tailoring, TailorOutput } from './resume-domain.js';
 
 export const statuses = [
   'Applied',
@@ -62,6 +63,7 @@ export type Application = Job & {
   createdAt: string;
   updatedAt: string;
   events: Event[];
+  tailoring?: Tailoring;
 };
 export type Email = {
   id: string;
@@ -98,6 +100,9 @@ export type GmailConfig = {
   lastSyncAt?: string;
 };
 export interface Store {
+  listResumes(): Promise<Resume[]>;
+  saveResume(resume: Resume): Promise<void>;
+  deleteResume(id: string): Promise<void>;
   listApplications(): Promise<Application[]>;
   saveApplication(app: Application): Promise<void>;
   deleteApplication(id: string): Promise<void>;
@@ -110,6 +115,10 @@ export interface Store {
   exclusive<T>(work: () => Promise<T>): Promise<T>;
 }
 export interface AI {
+  tailor(input: {
+    job: Pick<Job, 'company' | 'title' | 'jobSummary' | 'keyRequirements'>;
+    resumes: Resume[];
+  }): Promise<TailorOutput>;
   extract(input: { url: string; pageTitle: string; text: string }): Promise<Job>;
   classify(text: string): Promise<Classification>;
 }

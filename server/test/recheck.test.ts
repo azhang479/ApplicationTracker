@@ -4,6 +4,7 @@ import { GmailService } from '../src/gmail.js';
 import { Tracker } from '../src/service.js';
 import type { AI, Application, Classification, GmailConfig, Review, Store } from '../src/domain.js';
 import type { Config } from '../src/config.js';
+import type { Resume } from '../src/resume-domain.js';
 
 vi.mock('googleapis/build/src/apis/gmail/index.js', () => ({ gmail: vi.fn() }));
 const now = '2026-06-01T00:00:00.000Z';
@@ -50,6 +51,19 @@ function event(id = 'm1', date = '2026-05-30') {
   };
 }
 class MemoryStore implements Store {
+  resumes: Resume[] = [];
+  async listResumes() {
+    return structuredClone(this.resumes);
+  }
+  async saveResume(resume: Resume) {
+    this.resumes = [
+      ...this.resumes.filter((item) => item.id !== resume.id),
+      structuredClone(resume),
+    ];
+  }
+  async deleteResume(id: string) {
+    this.resumes = this.resumes.filter((item) => item.id !== id);
+  }
   apps = [application()];
   reviews: Review[] = [];
   processed = new Set(['m1']);

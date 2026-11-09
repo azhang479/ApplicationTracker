@@ -1,12 +1,14 @@
 import { Firestore, Transaction } from '@google-cloud/firestore';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Application, GmailConfig, Review, Store } from './domain.js';
+import type { Resume } from './resume-domain.js';
 
 type Context = {
   apps: Map<string, Application>;
   reviews: Map<string, Review>;
   writes: (() => void)[];
   transaction: Transaction;
+  resumes?: Map<string, Resume>;
 };
 export class FirestoreStore implements Store {
   private context = new AsyncLocalStorage<Context>();
@@ -33,6 +35,39 @@ export class FirestoreStore implements Store {
     return (await this.db.collection('applications').get()).docs.map(
       (d) => ({ ...d.data(), id: d.id }) as Application,
     );
+  }
+  async listResumes() {
+    const ctx = this.context.getStore();
+    if (ctx) {
+      if (!ctx.resumes) {
+        const snapshot = await ctx.transaction.get(this.db.collection('resumes'));
+        ctx.resumes = new Map(
+          snapshot.docs.map((doc) => [doc.id, { ...doc.data(), id: doc.id } as Resume]),
+        );
+      }
+      return [...ctx.resumes.values()];
+    }
+    return (await this.db.collection('resumes').get()).docs.map(
+      (doc) => ({ ...doc.data(), id: doc.id }) as Resume,
+    );
+  }
+  async saveResume(resume: Resume) {
+    const ref = this.db.collection('resumes').doc(resume.id);
+    const ctx = this.context.getStore();
+    if (ctx) {
+      await this.listResumes();
+      ctx.resumes!.set(resume.id, resume);
+      ctx.writes.push(() => ctx.transaction.set(ref, resume));
+    } else await ref.set(resume);
+  }
+  async deleteResume(id: string) {
+    const ref = this.db.collection('resumes').doc(id);
+    const ctx = this.context.getStore();
+    if (ctx) {
+      await this.listResumes();
+      ctx.resumes!.delete(id);
+      ctx.writes.push(() => ctx.transaction.delete(ref));
+    } else await ref.delete();
   }
   async saveApplication(app: Application) {
     const ref = this.db.collection('applications').doc(app.id);
