@@ -284,6 +284,7 @@ main {
   font-weight: 500;
 }
 .workspace-nav {
+  overflow-x: auto;
   display: inline-flex;
   max-width: 100%;
   gap: 0.25rem;
@@ -401,7 +402,53 @@ th.table-head:has(.column-sort) {
 .tailor-page pre {
   overflow-wrap: anywhere;
 }
+.flow-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+}
+.flow-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.flow-chart {
+  display: block;
+  min-width: 640px;
+}
+.flow-link {
+  stroke-opacity: 0.3;
+  transition: stroke-opacity 120ms;
+}
+.flow-link:hover {
+  stroke-opacity: 0.75;
+}
+.flow-label {
+  pointer-events: none;
+}
+.flow-label rect {
+  fill: var(--surface);
+  fill-opacity: 0.88;
+  stroke: var(--border);
+  stroke-opacity: 0.4;
+}
+.flow-label text {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.workspace-stats .insights-stat {
+  padding: 1rem;
+}
+.insights-stat-detail {
+  color: var(--faint);
+  font-size: 0.6875rem;
+  margin-top: 0.25rem;
+}
 @media (max-width: 479px) {
+  .workspace-stats .insights-stat {
+    padding: 0.75rem;
+  }
   .workspace-nav .tab {
     padding: 0.5rem 0.625rem;
     font-size: 0.75rem;
