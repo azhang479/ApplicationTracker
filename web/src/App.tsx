@@ -6,6 +6,7 @@ import { EmailRecheck, type RecheckCounts } from './EmailRecheck';
 import { ReviewCard } from './ReviewCard';
 import { Resumes } from './Resumes';
 import { Tailor } from './Tailor';
+import { Insights } from './Insights';
 import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
   Application,
@@ -210,7 +211,7 @@ export function App() {
           ))}
         </div>
         <nav className="workspace-nav flex gap-7 border-b mb-7" aria-label="Workspace tabs">
-          {['Applications', 'Needs review', 'Settings'].map((name) => (
+          {['Applications', 'Needs review', 'Insights', 'Settings'].map((name) => (
             <button
               key={name}
               onClick={() => setTab(name)}
@@ -430,6 +431,7 @@ export function App() {
             )}
           </section>
         )}
+        {!loading && tab === 'Insights' && <Insights apps={apps} />}
         {!loading && tab === 'Settings' && (
           <>
             <section className="card max-w-2xl p-7">
