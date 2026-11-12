@@ -15,6 +15,7 @@ import {
   Status,
   statuses,
   statusColors,
+  statusLabel,
   salary,
   formatDate,
 } from './types';
@@ -107,7 +108,12 @@ export function App() {
   }, [token, refresh]);
   async function save(
     id: string,
-    fields: Job & { status: Status; appliedAt: string; lastActivityAt: string },
+    fields: Job & {
+      status: Status;
+      interviewRound?: number;
+      appliedAt: string;
+      lastActivityAt: string;
+    },
   ) {
     await api('/api/applications/' + encodeURIComponent(id), 'PATCH', fields);
     await refresh();
@@ -367,7 +373,7 @@ export function App() {
                         <td className="px-5 py-5">
                           <span className={'status-badge ' + statusColors[app.status]}>
                             <span className="w-1.5 h-1.5 bg-current rounded-full" />
-                            {app.status}
+                            {statusLabel(app)}
                           </span>
                           {app.status === 'Online Assessment' && <AssessmentEmailLink app={app} />}
                         </td>

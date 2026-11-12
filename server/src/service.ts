@@ -8,7 +8,8 @@ import {
   Job,
   Store,
   Status,
-  emailStatus,
+  emailProgress,
+  interviewRoundSchema,
   emailEventTime,
   matchesEmail,
   jobSchema,
@@ -18,17 +19,33 @@ import {
 } from './domain.js';
 
 const JOB_TEXT_LIMIT = 20_000;
+function eventRound(
+  progress: Pick<Application, 'status' | 'interviewRound'>,
+  classification: Classification,
+) {
+  return classification.category === 'interview'
+    ? Math.max(progress.interviewRound || 1, classification.interviewRound || 1)
+    : progress.status === 'Interview'
+      ? progress.interviewRound || 1
+      : undefined;
+}
 
 export const patchSchema = jobSchema
   .partial()
   .extend({
     status: z.enum(statuses).optional(),
+    interviewRound: interviewRoundSchema.optional(),
     appliedAt: z.string().datetime().optional(),
     lastActivityAt: z.string().datetime().optional(),
   })
   .strict();
 export const resolveSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('apply'), applicationId: z.string(), status: z.enum(statuses) }),
+  z.object({
+    type: z.literal('apply'),
+    applicationId: z.string(),
+    status: z.enum(statuses),
+    interviewRound: interviewRoundSchema.optional(),
+  }),
   z.object({ type: z.literal('create'), fields: jobSchema }),
   z.object({ type: z.literal('dismiss') }),
 ]);
@@ -79,8 +96,20 @@ export class Tracker {
       const app = (await this.store.listApplications()).find((a) => a.id === id);
       if (!app) throw new NotFound();
       const now = this.now();
-      if (fields.status && fields.status !== app.status) {
-        app.events.push({ at: now, type: 'status_change', status: fields.status });
+      const status = fields.status ?? app.status;
+      const round = fields.interviewRound ?? app.interviewRound ?? 1;
+      if (
+        (fields.status && fields.status !== app.status) ||
+        (status === 'Interview' &&
+          fields.interviewRound !== undefined &&
+          round !== (app.interviewRound ?? 1))
+      ) {
+        app.events.push({
+          at: now,
+          type: 'status_change',
+          status,
+          ...(status === 'Interview' ? { interviewRound: round } : {}),
+        });
         app.lastActivityAt = now;
       }
       Object.assign(app, fields, { updatedAt: now });
@@ -106,15 +135,36 @@ export class Tracker {
         );
       let changed = false;
       for (const event of existing.events.filter((event) => matchesEmail(event, email))) {
-        if (event.type === classification.category) continue;
-        event.type = classification.category;
-        if (event === latest) {
-          existing.status = emailStatus(existing.status, classification.category);
-          event.status = existing.status;
-        } else {
-          event.status = emailStatus(event.status || 'Applied', classification.category);
+        if (event.type === classification.category && classification.category !== 'interview')
+          continue;
+        const progress = emailProgress(
+          event === latest
+            ? existing
+            : { status: event.status || 'Applied', interviewRound: event.interviewRound },
+          classification,
+        );
+        const round =
+          classification.category === 'interview'
+            ? Math.max(event.interviewRound || 1, eventRound(progress, classification) || 1)
+            : eventRound(progress, classification);
+        if (
+          event.type !== classification.category ||
+          event.status !== progress.status ||
+          event.interviewRound !== round
+        ) {
+          Object.assign(event, { type: classification.category, status: progress.status });
+          if (round !== undefined) event.interviewRound = round;
+          else delete event.interviewRound;
+          changed = true;
         }
-        changed = true;
+        if (
+          event === latest &&
+          (existing.status !== progress.status ||
+            existing.interviewRound !== progress.interviewRound)
+        ) {
+          Object.assign(existing, progress);
+          changed = true;
+        }
       }
       if (!changed) return 'skipped';
       existing.updatedAt = this.now();
@@ -149,14 +199,16 @@ export class Tracker {
     classification: Classification,
     statusOverride?: Status,
   ) {
-    app.status = statusOverride ?? emailStatus(app.status, classification.category);
+    Object.assign(app, emailProgress(app, classification, statusOverride));
     if (!app.jobId && classification.jobId && classification.category === 'confirmation')
       app.jobId = classification.jobId;
     app.lastActivityAt = app.updatedAt = this.now();
+    const round = eventRound(app, classification);
     app.events.push({
       at: this.now(),
       type: classification.category,
       status: app.status,
+      ...(round !== undefined ? { interviewRound: round } : {}),
       emailSubject: email.subject,
       emailFrom: email.from,
       emailDate: email.date,
@@ -174,7 +226,17 @@ export class Tracker {
           (a) => a.id === action.applicationId,
         );
         if (!app) throw new NotFound();
-        await this.applyEmail(app, review.email, review.classification, action.status);
+        await this.applyEmail(
+          app,
+          review.email,
+          {
+            ...review.classification,
+            ...(action.interviewRound !== undefined
+              ? { interviewRound: action.interviewRound }
+              : {}),
+          },
+          action.status,
+        );
       } else if (action.type === 'create') {
         await this.applyEmail(this.create(action.fields), review.email, review.classification);
       }

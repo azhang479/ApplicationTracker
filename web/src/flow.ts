@@ -1,12 +1,22 @@
 import type { Application, Status } from './types';
 
-const pipeline = ['Online Assessment', 'OA Completed', 'Interview', 'Offer'] as const;
+export const interviewStages = [
+  'Interview 1',
+  'Interview 2',
+  'Interview 3',
+  'Interview 4',
+  'Interview 5',
+] as const;
+const pipeline = ['Online Assessment', 'OA Completed', ...interviewStages, 'Offer'] as const;
 const terminals = ['Rejected', 'Withdrawn', 'Ghosted'] as const;
 const stages = ['Applications', ...pipeline, ...terminals, 'No response yet'] as const;
 export type FlowStage = (typeof stages)[number];
 export type FlowNode = { id: FlowStage; count: number };
 export type FlowLink = { source: FlowStage; target: FlowStage; value: number };
-export type FlowApplication = Pick<Application, 'status' | 'events' | 'appliedAt'>;
+export type FlowApplication = Pick<
+  Application,
+  'status' | 'interviewRound' | 'events' | 'appliedAt'
+>;
 export type AppliedWindow = 0 | 30 | 90;
 
 export function applicationPath(app: FlowApplication): FlowStage[] {
@@ -16,7 +26,18 @@ export function applicationPath(app: FlowApplication): FlowStage[] {
       .flatMap((event) => (event.status ? [event.status] : [])),
     app.status,
   ]);
-  const path: FlowStage[] = ['Applications', ...pipeline.filter((stage) => reached.has(stage))];
+  const rounds = Math.max(
+    app.interviewRound ?? (app.status === 'Interview' ? 1 : 0),
+    ...app.events.map((event) => event.interviewRound ?? (event.status === 'Interview' ? 1 : 0)),
+  );
+  const path: FlowStage[] = [
+    'Applications',
+    ...pipeline.filter((stage) =>
+      stage.startsWith('Interview ')
+        ? interviewStages.indexOf(stage as (typeof interviewStages)[number]) < rounds
+        : reached.has(stage as Status),
+    ),
+  ];
   if (terminals.some((stage) => stage === app.status)) path.push(app.status as FlowStage);
   else if (path.length === 1) path.push('No response yet');
   return path;
@@ -40,11 +61,12 @@ export function buildFlow(applications: FlowApplication[]) {
       links.set(key, link);
     }
     if (
+      path.includes('Interview 1') ||
       app.status !== 'Applied' ||
       app.events.some((event) => event.status && event.status !== 'Applied')
     )
       responded++;
-    if (path.includes('Interview')) interviews++;
+    if (path.includes('Interview 1')) interviews++;
     if (path.includes('Offer')) offers++;
   }
   return {

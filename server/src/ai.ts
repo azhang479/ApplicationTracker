@@ -85,23 +85,33 @@ export class VertexAI implements AI {
     });
   }
   async classify(text: string) {
-    return classificationSchema.parse(
-      await this.generate(
-        'Classify a job application email. Use assessment_completed when the candidate has already completed or submitted an assessment, such as "You have completed your HackerRank assessment" or "Thank you for completing the assessment". Use online_assessment for invitations, reminders, or new assessment rounds, not completion acknowledgements. Use empty strings for unknown company, title or jobId. Do not invent identifiers.',
-        text,
-        {
-          isJobRelated: { type: Type.BOOLEAN },
-          category: {
-            ...string,
-            enum: classificationSchema.shape.category.options,
+    const result = classificationSchema
+      .extend({ interviewRound: z.number().int().optional() })
+      .parse(
+        await this.generate(
+          'Classify a job application email. Use assessment_completed when the candidate has already completed or submitted an assessment, such as "You have completed your HackerRank assessment" or "Thank you for completing the assessment". Use online_assessment for invitations, reminders, or new assessment rounds, not completion acknowledgements. Set interviewRound only for interview emails explicitly stating a numbered round, such as "second round", "round 3", or "2nd interview". Return an integer from 1 to 5, clamping higher stated rounds to 5. Return 0 when not explicitly stated, for "final round", or for non-interview emails. Never infer a round from prior activity or assessment rounds. Use empty strings for unknown company, title or jobId. Do not invent identifiers.',
+          text,
+          {
+            isJobRelated: { type: Type.BOOLEAN },
+            category: {
+              ...string,
+              enum: classificationSchema.shape.category.options,
+            },
+            company: string,
+            title: string,
+            jobId: string,
+            summary: string,
+            interviewRound: { type: Type.INTEGER, minimum: 0, maximum: 5 },
           },
-          company: string,
-          title: string,
-          jobId: string,
-          summary: string,
-        },
-      ),
-    );
+        ),
+      );
+    return classificationSchema.parse({
+      ...result,
+      interviewRound:
+        result.category === 'interview' && result.interviewRound
+          ? Math.min(5, Math.max(1, result.interviewRound))
+          : 0,
+    });
   }
   async tailor(input: Parameters<AI['tailor']>[0]) {
     return tailorOutputSchema.parse(

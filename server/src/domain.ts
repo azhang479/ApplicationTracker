@@ -26,7 +26,9 @@ export const jobSchema = z.object({
   jobSummary: z.string(),
   keyRequirements: z.array(z.string()),
 });
+export const interviewRoundSchema = z.number().int().min(1).max(5);
 export const classificationSchema = z.object({
+  interviewRound: z.number().int().min(0).max(5).optional(),
   isJobRelated: z.boolean(),
   category: z.enum([
     'confirmation',
@@ -46,6 +48,7 @@ export type Job = z.infer<typeof jobSchema>;
 export type Classification = z.infer<typeof classificationSchema>;
 export type Status = (typeof statuses)[number];
 export type Event = {
+  interviewRound?: number;
   at: string;
   type: string;
   status?: Status;
@@ -56,6 +59,7 @@ export type Event = {
   gmailLink?: string;
 };
 export type Application = Job & {
+  interviewRound?: number;
   id: string;
   status: Status;
   appliedAt: string;
@@ -214,6 +218,31 @@ export function emailStatus(current: Status, category: Classification['category'
   if (!next) return current;
   if (current === 'OA Completed' && next === 'Online Assessment') return next;
   return statuses.indexOf(next) > statuses.indexOf(current) ? next : current;
+}
+export function emailProgress(
+  current: Pick<Application, 'status' | 'interviewRound'>,
+  classification: Classification,
+  override?: Status,
+) {
+  let status = emailStatus(current.status, classification.category);
+  if (
+    override &&
+    classification.category !== 'rejection' &&
+    current.status !== 'Rejected' &&
+    current.status !== 'Withdrawn' &&
+    (current.status !== 'Offer' || override === 'Rejected')
+  )
+    status = override;
+  let round = current.interviewRound;
+  if (status === 'Interview') {
+    round = Math.max(
+      current.interviewRound || 1,
+      classification.category === 'interview' || override === 'Interview'
+        ? classification.interviewRound || 1
+        : 1,
+    );
+  }
+  return { status, ...(round !== undefined ? { interviewRound: round } : {}) };
 }
 export const passesPrefilter = (text: string) =>
   /\b(applications?|applying|applied|candidacy|candidates?|interviews?|assessments?|position|role|recruit\w*|offers?|unfortunately|move forward|moving forward|next steps|hiring|thank you for your interest|talent|hackerrank|codesignal|coding[\s-]+challenges?|scheduling|schedule[ds]?|screens?|screening|phone[\s-]+screens?|opportunit(?:y|ies)|careers?|regret|not selected|decided|offer[\s-]+letter|background[\s-]+checks?|onboarding)\b/i.test(

@@ -124,7 +124,11 @@ export function createApp(
   app.patch(
     '/api/applications/:id',
     wrap(async (req, res) => {
-      res.json(await tracker.patch(req.params.id, patchSchema.parse(req.body)));
+      const parsed = patchSchema.parse(req.body);
+      const fields = Object.fromEntries(
+        Object.entries(parsed).filter(([key]) => Object.hasOwn(req.body, key)),
+      );
+      res.json(await tracker.patch(req.params.id, fields));
     }),
   );
   app.delete(

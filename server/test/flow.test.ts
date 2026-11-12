@@ -24,7 +24,7 @@ describe('application flow', () => {
       applicationPath(
         app('Rejected', ['Applied', 'Online Assessment', 'OA Completed', 'Interview']),
       ),
-    ).toEqual(['Applications', 'Online Assessment', 'OA Completed', 'Interview', 'Rejected']);
+    ).toEqual(['Applications', 'Online Assessment', 'OA Completed', 'Interview 1', 'Rejected']);
   });
   it('collapses repeated rounds and out-of-order history into an acyclic pipeline', () => {
     const input = app('Online Assessment', [
@@ -39,7 +39,7 @@ describe('application flow', () => {
       'Applications',
       'Online Assessment',
       'OA Completed',
-      'Interview',
+      'Interview 1',
     ]);
     expect(input).toEqual(original);
   });
@@ -50,7 +50,7 @@ describe('application flow', () => {
       expect(applicationPath(app(status, ['Online Assessment', status, 'Interview']))).toEqual([
         'Applications',
         'Online Assessment',
-        'Interview',
+        'Interview 1',
         status,
       ]);
     },
@@ -60,17 +60,17 @@ describe('application flow', () => {
     expect(applicationPath(app('OA Completed'))).toEqual(['Applications', 'OA Completed']);
     expect(applicationPath(app('Offer', ['Applied', 'Interview']))).toEqual([
       'Applications',
-      'Interview',
+      'Interview 1',
       'Offer',
     ]);
     expect(applicationPath(app('Interview', ['Ghosted', 'Online Assessment']))).toEqual([
       'Applications',
       'Online Assessment',
-      'Interview',
+      'Interview 1',
     ]);
     expect(
       applicationPath({ ...app('Interview'), events: [{ at: 'bad-date', type: 'note' }] }),
-    ).toEqual(['Applications', 'Interview']);
+    ).toEqual(['Applications', 'Interview 1']);
   });
   it('aggregates unique-app counts and merges terminal nodes reached from different stages', () => {
     const flow = buildFlow([
@@ -83,8 +83,8 @@ describe('application flow', () => {
     ]);
     expect(flow.nodes.find((node) => node.id === 'Applications')?.count).toBe(6);
     expect(flow.nodes.find((node) => node.id === 'Rejected')?.count).toBe(2);
-    expect(flow.nodes.find((node) => node.id === 'Interview')?.count).toBe(2);
-    expect(flow.links).toContainEqual({ source: 'Interview', target: 'Rejected', value: 1 });
+    expect(flow.nodes.find((node) => node.id === 'Interview 1')?.count).toBe(2);
+    expect(flow.links).toContainEqual({ source: 'Interview 1', target: 'Rejected', value: 1 });
     expect(flow.links).toContainEqual({ source: 'Applications', target: 'Rejected', value: 1 });
     expect(
       flow.links
