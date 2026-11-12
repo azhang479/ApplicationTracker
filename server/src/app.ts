@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { z, ZodError } from 'zod';
 import { Config } from './config.js';
 import { TokenVerifier, auth, sameSecret, signState, validState } from './auth.js';
-import { Tracker, NotFound, patchSchema, resolveSchema } from './service.js';
+import { Tracker, NotFound, EventConflict, patchSchema, resolveSchema } from './service.js';
 import { GmailService } from './gmail.js';
 import { logError } from './logging.js';
 import { ResumeService, ResumeError } from './resume-service.js';
@@ -129,6 +129,22 @@ export function createApp(
         Object.entries(parsed).filter(([key]) => Object.hasOwn(req.body, key)),
       );
       res.json(await tracker.patch(req.params.id, fields));
+    }),
+  );
+  app.delete(
+    '/api/applications/:id/events/:index',
+    wrap(async (req, res) => {
+      const index = z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(Number.MAX_SAFE_INTEGER)
+        .parse(req.params.index);
+      const expected = z
+        .object({ at: z.string().min(1).max(200), type: z.string().min(1).max(200) })
+        .strict()
+        .parse(req.query);
+      res.json(await tracker.deleteEvent(req.params.id, index, expected));
     }),
   );
   app.delete(
@@ -283,6 +299,10 @@ export function createApp(
     }
     if (error instanceof NotFound) {
       res.sendStatus(404);
+      return;
+    }
+    if (error instanceof EventConflict) {
+      res.status(409).json({ error: error.message });
       return;
     }
     res.status(503).json({ error: 'Service temporarily unavailable' });

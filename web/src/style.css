@@ -422,9 +422,6 @@ th.table-head:has(.column-sort) {
 .flow-link:hover {
   stroke-opacity: 0.75;
 }
-.flow-label {
-  pointer-events: none;
-}
 .flow-label rect {
   fill: var(--surface);
   fill-opacity: 0.88;

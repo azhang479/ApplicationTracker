@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { sankey, sankeyLinkHorizontal, type SankeyNode } from 'd3-sankey';
 import {
   buildFlow,
+  applicationsForStage,
   filterApplied,
   interviewStages,
   type AppliedWindow,
   type FlowNode,
   type FlowStage,
 } from './flow';
-import type { Application } from './types';
+import { statusColors, statusLabel, type Application } from './types';
 
 type LayoutNode = SankeyNode<FlowNode, { value: number }>;
 
@@ -51,7 +52,15 @@ function labelLines(label: string) {
   return lines;
 }
 
-function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
+function FlowChart({
+  flow,
+  selectedStage,
+  selectStage,
+}: {
+  flow: ReturnType<typeof buildFlow>;
+  selectedStage: FlowStage | null;
+  selectStage: (stage: FlowStage) => void;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const minWidth = Math.max(
     640,
@@ -109,7 +118,7 @@ function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        role="img"
+        role="group"
         aria-labelledby="flow-title flow-description"
       >
         <title id="flow-title">Application stages and outcomes</title>
@@ -146,7 +155,23 @@ function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
           const labelHeight = lines.length * 14 + 8;
           const labelX = right ? 20 : -8 - labelWidth;
           return (
-            <g key={node.id} transform={`translate(${x}, ${y})`}>
+            <g
+              key={node.id}
+              transform={`translate(${x}, ${y})`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${node.id}: ${node.count}`}
+              aria-pressed={selectedStage === node.id}
+              aria-controls="flow-applications"
+              className="cursor-pointer focus:outline focus:outline-2 focus:outline-slate-900"
+              onClick={() => selectStage(node.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  selectStage(node.id);
+                }
+              }}
+            >
               <rect fill={stageColors[node.id]} width={12} height={nodeHeight} rx={2}>
                 <title>
                   {node.id}: {node.count}
@@ -173,9 +198,19 @@ function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
   );
 }
 
-export function Insights({ apps }: { apps: Application[] }) {
+export function Insights({
+  apps,
+  openApplication,
+}: {
+  apps: Application[];
+  openApplication: (app: Application) => void;
+}) {
   const [days, setDays] = useState<AppliedWindow>(0);
-  const flow = useMemo(() => buildFlow(filterApplied(apps, days)), [apps, days]);
+  const [selectedStage, setSelectedStage] = useState<FlowStage | null>(null);
+  const filtered = useMemo(() => filterApplied(apps, days), [apps, days]);
+  const flow = useMemo(() => buildFlow(filtered), [filtered]);
+  const members = selectedStage ? applicationsForStage(filtered, selectedStage) : [];
+  const activeStage = flow.nodes.some((node) => node.id === selectedStage) ? selectedStage : null;
   return (
     <section aria-label="Application insights">
       <div
@@ -189,7 +224,10 @@ export function Insights({ apps }: { apps: Application[] }) {
             key={value}
             className={`chip ${days === value ? 'chip-active' : ''}`}
             aria-pressed={days === value}
-            onClick={() => setDays(value)}
+            onClick={() => {
+              setDays(value);
+              setSelectedStage(null);
+            }}
           >
             {value ? `Last ${value} days` : 'All time'}
           </button>
@@ -230,7 +268,13 @@ export function Insights({ apps }: { apps: Application[] }) {
           {flow.total} applications · Recorded stages, with repeated OA rounds counted once.
         </p>
         {flow.total ? (
-          <FlowChart flow={flow} />
+          <FlowChart
+            flow={flow}
+            selectedStage={activeStage}
+            selectStage={(stage) =>
+              setSelectedStage((current) => (current === stage ? null : stage))
+            }
+          />
         ) : (
           <div className="py-16 text-center">
             <h3 className="font-medium text-sm">
@@ -242,6 +286,45 @@ export function Insights({ apps }: { apps: Application[] }) {
                 : 'Track a job to start building your application journey.'}
             </p>
           </div>
+        )}
+        {activeStage && (
+          <section
+            id="flow-applications"
+            aria-labelledby="flow-applications-title"
+            className="mt-4 rounded-lg border border-slate-200 overflow-hidden"
+          >
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <h3 id="flow-applications-title" className="text-sm font-semibold">
+                {activeStage}: {members.length}
+              </h3>
+              <button
+                type="button"
+                className="secondary-button"
+                aria-label="Close application list"
+                onClick={() => setSelectedStage(null)}
+              >
+                ×
+              </button>
+            </div>
+            <ul className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+              {members.map((app) => (
+                <li key={app.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-4 py-3 flex flex-wrap items-center justify-between gap-2 hover:bg-slate-50 focus-visible:bg-slate-50"
+                    onClick={() => openApplication(app)}
+                  >
+                    <span className="text-sm min-w-0 break-words flex-1">
+                      {app.company} — {app.title}
+                    </span>
+                    <span className={'status-badge shrink-0 ' + statusColors[app.status]}>
+                      {statusLabel(app)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         {flow.total > 0 && (
           <p className="text-xs text-slate-500 mt-4">
