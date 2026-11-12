@@ -176,6 +176,55 @@ describe('Gemini extraction', () => {
 });
 describe('Gemini assessment classification', () => {
   it.each([
+    ['Second round interview', 2, 2],
+    ['Round 3 interview', 3, 3],
+    ['2nd interview', 2, 2],
+    ['Final round interview', 0, 0],
+    ['Interview invitation', 0, 0],
+    ['Round 9 interview', 9, 5],
+  ])('accepts explicit/unknown interview rounds for %s', async (text, value, expected) => {
+    generate.mockResolvedValue({
+      text: JSON.stringify({
+        isJobRelated: true,
+        category: 'interview',
+        company: 'Acme',
+        title: '',
+        jobId: '',
+        summary: text,
+        interviewRound: value,
+      }),
+    });
+    expect((await ai.classify(text)).interviewRound).toBe(expected);
+    const request = generate.mock.calls[0][0];
+    expect(request.config.systemInstruction).toContain(
+      'only for interview emails explicitly stating a numbered round',
+    );
+    expect(request.config.systemInstruction).toContain('for "final round"');
+    expect(request.config.responseSchema.properties.interviewRound).toMatchObject({
+      type: 'INTEGER',
+      minimum: 0,
+      maximum: 5,
+    });
+    expect(request.config.responseSchema.required).toContain('interviewRound');
+  });
+  it('rejects fractional rounds and ignores assessment round numbers', async () => {
+    const value = {
+      isJobRelated: true,
+      category: 'interview',
+      company: 'Acme',
+      title: '',
+      jobId: '',
+      summary: 'Interview',
+      interviewRound: 1.5,
+    };
+    generate.mockResolvedValue({ text: JSON.stringify(value) });
+    await expect(ai.classify('Interview')).rejects.toThrow();
+    generate.mockResolvedValue({
+      text: JSON.stringify({ ...value, category: 'online_assessment', interviewRound: 3 }),
+    });
+    expect((await ai.classify('Assessment round 3')).interviewRound).toBe(0);
+  });
+  it.each([
     ["You've completed your HackerRank assessment", 'assessment_completed'],
     ['Thank you for completing the assessment', 'assessment_completed'],
     ['Complete your next HackerRank assessment', 'online_assessment'],
@@ -189,7 +238,7 @@ describe('Gemini assessment classification', () => {
       summary: text,
     };
     generate.mockResolvedValue({ text: JSON.stringify(classification) });
-    expect(await ai.classify(text)).toEqual(classification);
+    expect(await ai.classify(text)).toEqual({ ...classification, interviewRound: 0 });
     const request = generate.mock.calls[0][0];
     expect(request.config.responseSchema.properties.category.enum).toContain(
       'assessment_completed',

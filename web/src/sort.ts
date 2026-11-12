@@ -8,12 +8,22 @@ export function defaultSortDirection(key: SortKey): SortDirection {
 
 type SortableApplication = Pick<
   Application,
-  'company' | 'status' | 'salaryMax' | 'salaryMin' | 'appliedAt' | 'lastActivityAt'
+  | 'company'
+  | 'status'
+  | 'interviewRound'
+  | 'salaryMax'
+  | 'salaryMin'
+  | 'appliedAt'
+  | 'lastActivityAt'
 >;
 
 function sortValue(app: SortableApplication, key: SortKey): string | number | null {
   if (key === 'company') return app.company;
-  if (key === 'status') return statuses.indexOf(app.status);
+  if (key === 'status')
+    return (
+      statuses.indexOf(app.status) * 10 +
+      (app.status === 'Interview' ? (app.interviewRound ?? 1) : 0)
+    );
   if (key === 'salary') return app.salaryMax ?? app.salaryMin;
   const date = Date.parse(app[key]);
   return Number.isFinite(date) ? date : null;

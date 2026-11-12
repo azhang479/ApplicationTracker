@@ -3,6 +3,7 @@ import { sankey, sankeyLinkHorizontal, type SankeyNode } from 'd3-sankey';
 import {
   buildFlow,
   filterApplied,
+  interviewStages,
   type AppliedWindow,
   type FlowNode,
   type FlowStage,
@@ -15,7 +16,11 @@ const stageColors: Record<FlowStage, string> = {
   Applications: 'var(--accent)',
   'Online Assessment': '#f59e0b',
   'OA Completed': '#06b6d4',
-  Interview: '#3b82f6',
+  'Interview 1': '#93c5fd',
+  'Interview 2': '#60a5fa',
+  'Interview 3': '#3b82f6',
+  'Interview 4': '#2563eb',
+  'Interview 5': '#1d4ed8',
   Offer: '#22c55e',
   Rejected: '#f43f5e',
   Withdrawn: '#64748b',
@@ -24,7 +29,7 @@ const stageColors: Record<FlowStage, string> = {
 };
 const stageOrder: FlowStage[] = [
   'Offer',
-  'Interview',
+  ...[...interviewStages].reverse(),
   'OA Completed',
   'Online Assessment',
   'Rejected',
@@ -48,15 +53,27 @@ function labelLines(label: string) {
 
 function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
   const container = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+  const minWidth = Math.max(
+    640,
+    (flow.nodes.filter(
+      (node) =>
+        node.id === 'Online Assessment' ||
+        node.id === 'OA Completed' ||
+        node.id === 'Offer' ||
+        node.id.startsWith('Interview '),
+    ).length +
+      1) *
+      120,
+  );
+  const [width, setWidth] = useState(minWidth);
   const height = 480;
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
-      setWidth(Math.max(640, Math.floor(entries[0].contentRect.width)));
+      setWidth(Math.max(minWidth, Math.floor(entries[0].contentRect.width)));
     });
     observer.observe(container.current!);
     return () => observer.disconnect();
-  }, []);
+  }, [minWidth]);
   const graph = useMemo(
     () =>
       sankey<FlowNode, { value: number }>()

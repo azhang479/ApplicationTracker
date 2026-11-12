@@ -1,4 +1,7 @@
 export type { Application, Job, Review, Status } from '../../server/src/domain';
+export function statusLabel(app: { status: string; interviewRound?: number }) {
+  return app.status === 'Interview' ? `Interview · R${app.interviewRound ?? 1}` : app.status;
+}
 
 export const statuses = [
   'Applied',

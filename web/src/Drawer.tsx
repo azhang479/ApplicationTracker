@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { JobFields } from './JobFields';
 import { AssessmentEmailLink } from './AssessmentEmailLink';
-import { Application, Job, Status, statuses, formatDate } from './types';
+import { Application, Job, Status, statuses, formatDate, statusLabel, statusColors } from './types';
 
 export function Drawer({
   app,
@@ -13,7 +13,12 @@ export function Drawer({
   close: () => void;
   save: (
     id: string,
-    fields: Job & { status: Status; appliedAt: string; lastActivityAt: string },
+    fields: Job & {
+      status: Status;
+      interviewRound?: number;
+      appliedAt: string;
+      lastActivityAt: string;
+    },
   ) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }) {
@@ -34,6 +39,7 @@ export function Drawer({
     keyRequirements: app.keyRequirements,
   });
   const [status, setStatus] = useState(app.status);
+  const [round, setRound] = useState(app.interviewRound ?? 1);
   const localDate = (value: string) => {
     const date = new Date(value);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -73,6 +79,7 @@ export function Drawer({
               ...job,
               keyRequirements: job.keyRequirements.filter(Boolean),
               status,
+              ...(status === 'Interview' ? { interviewRound: round } : {}),
               appliedAt: new Date(applied).toISOString(),
               lastActivityAt: new Date(activity).toISOString(),
             }),
@@ -86,6 +93,9 @@ export function Drawer({
               {app.company}
             </h2>
             <p className="text-sm text-slate-500 mt-1">{app.title}</p>
+            <span className={'status-badge mt-2 ' + statusColors[status]}>
+              {statusLabel({ status, interviewRound: round })}
+            </span>
           </div>
           <button
             type="button"
@@ -116,6 +126,22 @@ export function Drawer({
               ))}
             </select>
           </label>
+          {status === 'Interview' && (
+            <div>
+              <label htmlFor="interview-round">Round</label>
+              <select
+                id="interview-round"
+                value={round}
+                onChange={(e) => setRound(Number(e.target.value))}
+              >
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <AssessmentEmailLink app={app} />
           <JobFields value={job} onChange={setJob} />
           <div className="grid grid-cols-2 gap-4">
@@ -146,7 +172,9 @@ export function Drawer({
                   <span className="absolute -left-[25px] top-1 w-2 h-2 rounded-full bg-slate-400 ring-4 ring-white" />
                   <p className="font-medium capitalize">
                     {event.type.replaceAll('_', ' ')}
-                    {event.status && ' · ' + event.status}
+                    {event.status &&
+                      ' · ' +
+                        statusLabel({ status: event.status, interviewRound: event.interviewRound })}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">{formatDate(event.at)}</p>
                   {event.emailSubject && <p className="mt-2">{event.emailSubject}</p>}
