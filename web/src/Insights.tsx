@@ -7,16 +7,33 @@ import {
   type FlowNode,
   type FlowStage,
 } from './flow';
-import { statusColors, type Application } from './types';
+import type { Application } from './types';
 
 type LayoutNode = SankeyNode<FlowNode, { value: number }>;
 
-function stageColor(stage: FlowStage) {
-  if (stage === 'Applications' || stage === 'Interview') return 'flow-accent';
-  return (
-    statusColors[stage]?.split(' ').find((name) => name.startsWith('text-')) || 'text-slate-500'
-  );
-}
+const stageColors: Record<FlowStage, string> = {
+  Applications: 'var(--accent)',
+  'Online Assessment': '#f59e0b',
+  'OA Completed': '#06b6d4',
+  Interview: '#3b82f6',
+  Offer: '#22c55e',
+  Rejected: '#f43f5e',
+  Withdrawn: '#64748b',
+  Ghosted: '#cbd5e1',
+  'No response yet': '#e2e8f0',
+};
+const stageOrder: FlowStage[] = [
+  'Offer',
+  'Interview',
+  'OA Completed',
+  'Online Assessment',
+  'Rejected',
+  'Withdrawn',
+  'Ghosted',
+  'No response yet',
+  'Applications',
+];
+const stageRank = (node: LayoutNode) => stageOrder.indexOf(node.id);
 
 function labelLines(label: string) {
   const words = label.split(' ');
@@ -45,8 +62,13 @@ function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
       sankey<FlowNode, { value: number }>()
         .nodeId((node) => node.id)
         .nodeWidth(12)
-        .nodePadding(30)
-        .nodeSort(null)
+        .nodePadding(42)
+        .nodeSort((a, b) => stageRank(a) - stageRank(b))
+        .linkSort((a, b) =>
+          a.source === b.source
+            ? stageRank(a.target as LayoutNode) - stageRank(b.target as LayoutNode)
+            : stageRank(a.source as LayoutNode) - stageRank(b.source as LayoutNode),
+        )
         .extent([
           [16, 24],
           [width - 16, height - 24],
@@ -85,9 +107,9 @@ function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
             return (
               <path
                 key={`${source.id}-${target.id}`}
-                className={`flow-link ${stageColor(target.id)}`}
+                className="flow-link"
                 d={linkPath(link)!}
-                stroke="currentColor"
+                stroke={stageColors[target.id]}
                 strokeWidth={link.width}
               >
                 <title>
@@ -108,13 +130,7 @@ function FlowChart({ flow }: { flow: ReturnType<typeof buildFlow> }) {
           const labelX = right ? 20 : -8 - labelWidth;
           return (
             <g key={node.id} transform={`translate(${x}, ${y})`}>
-              <rect
-                className={stageColor(node.id)}
-                fill="currentColor"
-                width={12}
-                height={nodeHeight}
-                rx={2}
-              >
+              <rect fill={stageColors[node.id]} width={12} height={nodeHeight} rx={2}>
                 <title>
                   {node.id}: {node.count}
                 </title>
@@ -145,7 +161,11 @@ export function Insights({ apps }: { apps: Application[] }) {
   const flow = useMemo(() => buildFlow(filterApplied(apps, days)), [apps, days]);
   return (
     <section aria-label="Application insights">
-      <div className="flex items-center flex-wrap gap-2 mb-5" role="group" aria-label="Applied in">
+      <div
+        className="application-filters flex items-center flex-wrap gap-2 mb-5"
+        role="group"
+        aria-label="Applied in"
+      >
         <span className="text-xs font-medium text-slate-500 mr-1">Applied in:</span>
         {([0, 30, 90] as const).map((value) => (
           <button

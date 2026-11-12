@@ -415,11 +415,8 @@ th.table-head:has(.column-sort) {
   display: block;
   min-width: 640px;
 }
-.flow-accent {
-  color: var(--accent);
-}
 .flow-link {
-  stroke-opacity: 0.35;
+  stroke-opacity: 0.3;
   transition: stroke-opacity 120ms;
 }
 .flow-link:hover {
