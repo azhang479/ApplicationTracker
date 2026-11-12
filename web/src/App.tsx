@@ -122,6 +122,16 @@ export function App() {
     await api('/api/applications/' + encodeURIComponent(id), 'DELETE');
     await refresh();
   }
+  async function removeEvent(id: string, index: number, event: Application['events'][number]) {
+    const query = new URLSearchParams({ at: event.at, type: event.type });
+    const updated = await api<Application>(
+      '/api/applications/' + encodeURIComponent(id) + '/events/' + index + '?' + query,
+      'DELETE',
+    );
+    setApps((current) => current.map((app) => (app.id === id ? updated : app)));
+    setSelected(updated);
+    return updated;
+  }
   async function resolve(id: string, action: object) {
     await api('/api/review/' + encodeURIComponent(id) + '/resolve', 'POST', action);
     await refresh();
@@ -437,7 +447,7 @@ export function App() {
             )}
           </section>
         )}
-        {!loading && tab === 'Insights' && <Insights apps={apps} />}
+        {!loading && tab === 'Insights' && <Insights apps={apps} openApplication={setSelected} />}
         {!loading && tab === 'Settings' && (
           <>
             <section className="card max-w-2xl p-7">
@@ -517,6 +527,7 @@ export function App() {
           close={() => setSelected(null)}
           save={save}
           remove={remove}
+          removeEvent={removeEvent}
         />
       )}
     </div>

@@ -233,10 +233,10 @@ export function emailProgress(
     (current.status !== 'Offer' || override === 'Rejected')
   )
     status = override;
-  let round = current.interviewRound;
+  let round: number | undefined;
   if (status === 'Interview') {
     round = Math.max(
-      current.interviewRound || 1,
+      current.status === 'Interview' ? current.interviewRound || 1 : 1,
       classification.category === 'interview' || override === 'Interview'
         ? classification.interviewRound || 1
         : 1,

@@ -27,8 +27,8 @@ export function applicationPath(app: FlowApplication): FlowStage[] {
     app.status,
   ]);
   const rounds = Math.max(
-    app.interviewRound ?? (app.status === 'Interview' ? 1 : 0),
-    ...app.events.map((event) => event.interviewRound ?? (event.status === 'Interview' ? 1 : 0)),
+    app.status === 'Interview' ? (app.interviewRound ?? 1) : 0,
+    ...app.events.map((event) => (event.status === 'Interview' ? (event.interviewRound ?? 1) : 0)),
   );
   const path: FlowStage[] = [
     'Applications',
@@ -41,6 +41,13 @@ export function applicationPath(app: FlowApplication): FlowStage[] {
   if (terminals.some((stage) => stage === app.status)) path.push(app.status as FlowStage);
   else if (path.length === 1) path.push('No response yet');
   return path;
+}
+
+export function applicationsForStage<T extends FlowApplication>(
+  applications: T[],
+  stage: FlowStage,
+): T[] {
+  return applications.filter((app) => applicationPath(app).includes(stage));
 }
 
 export function buildFlow(applications: FlowApplication[]) {

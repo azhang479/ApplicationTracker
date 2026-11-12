@@ -44,16 +44,16 @@ describe('interview-round progression', () => {
     ['Interview', 4, 2, 'Interview', 4],
     ['Interview', 2, 5, 'Interview', 5],
     ['Ghosted', undefined, 2, 'Interview', 2],
-    ['Ghosted', 3, 0, 'Interview', 3],
-    ['Offer', 3, 5, 'Offer', 3],
-    ['Rejected', 2, 4, 'Rejected', 2],
+    ['Ghosted', 3, 0, 'Interview', 1],
+    ['Offer', 3, 5, 'Offer', undefined],
+    ['Rejected', 2, 4, 'Rejected', undefined],
   ] as const)('%s / R%s + stated %s → %s / R%s', (status, currentRound, stated, next, round) => {
     expect(
       emailProgress(
         { status, interviewRound: currentRound },
         { ...classified, interviewRound: stated },
       ),
-    ).toEqual({ status: next, interviewRound: round });
+    ).toEqual({ status: next, ...(round !== undefined ? { interviewRound: round } : {}) });
   });
   it('gives rejection precedence, including explicit review overrides', () => {
     expect(
@@ -62,13 +62,13 @@ describe('interview-round progression', () => {
         { ...classified, category: 'rejection' },
         'Interview',
       ),
-    ).toEqual({ status: 'Rejected', interviewRound: 4 });
+    ).toEqual({ status: 'Rejected' });
     expect(
       emailProgress(
         { status: 'Offer', interviewRound: 4 },
         { ...classified, category: 'rejection' },
       ),
-    ).toEqual({ status: 'Rejected', interviewRound: 4 });
+    ).toEqual({ status: 'Rejected' });
   });
   it('records rounds on received events and never decreases with later interview emails', async () => {
     const { store, tracker } = setup();
@@ -97,10 +97,10 @@ describe('interview-round progression', () => {
         },
       ];
       await tracker.resolve(email.id, { type: 'apply', applicationId: 'job', status: 'Interview' });
-      expect(store.apps[0]).toMatchObject({
-        status: status === 'Applied' ? 'Interview' : status,
-        interviewRound: status === 'Applied' ? 2 : 4,
-      });
+      expect(store.apps[0].status).toBe(status === 'Applied' ? 'Interview' : status);
+      expect(store.apps[0].interviewRound).toBe(
+        status === 'Applied' ? 2 : status === 'Interview' ? 4 : undefined,
+      );
       expect(store.apps[0].events).toHaveLength(1);
     },
   );
@@ -151,12 +151,13 @@ describe('interview-round progression', () => {
       { at: email.date, type: 'other', status: 'Applied', gmailLink: email.gmailLink },
     ];
     await store.exclusive(() => tracker.recheckEmail(email, { ...classified, interviewRound: 4 }));
-    expect(store.apps[0]).toMatchObject({ status: 'Rejected', interviewRound: 2 });
+    expect(store.apps[0].status).toBe('Rejected');
+    expect(store.apps[0]).not.toHaveProperty('interviewRound');
     expect(store.apps[0].events[0]).toMatchObject({
       type: 'interview',
       status: 'Rejected',
-      interviewRound: 4,
     });
+    expect(store.apps[0].events[0]).not.toHaveProperty('interviewRound');
   });
   it('corrects a latest non-interview event into a numbered interview', async () => {
     const { store, tracker } = setup();

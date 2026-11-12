@@ -8,6 +8,7 @@ export function Drawer({
   close,
   save,
   remove,
+  removeEvent,
 }: {
   app: Application;
   close: () => void;
@@ -21,6 +22,11 @@ export function Drawer({
     },
   ) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  removeEvent: (
+    id: string,
+    index: number,
+    event: Application['events'][number],
+  ) => Promise<Application>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [job, setJob] = useState<Job>({
@@ -64,6 +70,24 @@ export function Drawer({
       close();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save your changes.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteTimelineEvent(index: number, event: Application['events'][number]) {
+    if (
+      !confirm(
+        'Delete this timeline entry? This cannot be undone. The current status will not change.',
+      )
+    )
+      return;
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await removeEvent(app.id, index, event);
+      setActivity(localDate(updated.lastActivityAt));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not delete this timeline entry.');
     } finally {
       setBusy(false);
     }
@@ -170,12 +194,26 @@ export function Drawer({
               {[...app.events].reverse().map((event, i) => (
                 <li key={i} className="relative text-sm">
                   <span className="absolute -left-[25px] top-1 w-2 h-2 rounded-full bg-slate-400 ring-4 ring-white" />
-                  <p className="font-medium capitalize">
-                    {event.type.replaceAll('_', ' ')}
-                    {event.status &&
-                      ' · ' +
-                        statusLabel({ status: event.status, interviewRound: event.interviewRound })}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium capitalize">
+                      {event.type.replaceAll('_', ' ')}
+                      {event.status &&
+                        ' · ' +
+                          statusLabel({
+                            status: event.status,
+                            interviewRound: event.interviewRound,
+                          })}
+                    </p>
+                    <button
+                      type="button"
+                      className="icon-button shrink-0"
+                      disabled={busy}
+                      aria-label={'Delete timeline entry ' + (app.events.length - i)}
+                      onClick={() => void deleteTimelineEvent(app.events.length - 1 - i, event)}
+                    >
+                      ×
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-400 mt-1">{formatDate(event.at)}</p>
                   {event.emailSubject && <p className="mt-2">{event.emailSubject}</p>}
                   {event.emailFrom && <p className="text-xs text-slate-500">{event.emailFrom}</p>}

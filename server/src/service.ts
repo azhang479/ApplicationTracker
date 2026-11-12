@@ -19,15 +19,8 @@ import {
 } from './domain.js';
 
 const JOB_TEXT_LIMIT = 20_000;
-function eventRound(
-  progress: Pick<Application, 'status' | 'interviewRound'>,
-  classification: Classification,
-) {
-  return classification.category === 'interview'
-    ? Math.max(progress.interviewRound || 1, classification.interviewRound || 1)
-    : progress.status === 'Interview'
-      ? progress.interviewRound || 1
-      : undefined;
+function eventRound(progress: Pick<Application, 'status' | 'interviewRound'>) {
+  return progress.status === 'Interview' ? progress.interviewRound || 1 : undefined;
 }
 
 export const patchSchema = jobSchema
@@ -50,6 +43,7 @@ export const resolveSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('dismiss') }),
 ]);
 export class NotFound extends Error {}
+export class EventConflict extends Error {}
 export type EmailOutcome = 'updated' | 'review' | 'skipped';
 export class Tracker {
   constructor(
@@ -113,6 +107,29 @@ export class Tracker {
         app.lastActivityAt = now;
       }
       Object.assign(app, fields, { updatedAt: now });
+      if (app.status !== 'Interview') delete app.interviewRound;
+      await this.store.saveApplication(app);
+      return app;
+    });
+  }
+  async deleteEvent(id: string, index: number, expected: { at: string; type: string }) {
+    return this.store.exclusive(async () => {
+      const app = (await this.store.listApplications()).find((app) => app.id === id);
+      if (!app || !app.events[index]) throw new NotFound();
+      const event = app.events[index];
+      if (event.at !== expected.at || event.type !== expected.type)
+        throw new EventConflict('Timeline changed. Reload the application and try again.');
+      app.events.splice(index, 1);
+      const latest = app.events.reduce<(typeof app.events)[number] | undefined>(
+        (latest, event) =>
+          Number.isFinite(Date.parse(event.at)) &&
+          (!latest || Date.parse(event.at) > Date.parse(latest.at))
+            ? event
+            : latest,
+        undefined,
+      );
+      app.lastActivityAt = latest?.at ?? app.appliedAt;
+      app.updatedAt = this.now();
       await this.store.saveApplication(app);
       return app;
     });
@@ -134,19 +151,22 @@ export class Tracker {
           undefined,
         );
       let changed = false;
+      const ordered = [...existing.events].sort((a, b) => emailEventTime(a) - emailEventTime(b));
       for (const event of existing.events.filter((event) => matchesEmail(event, email))) {
-        if (event.type === classification.category && classification.category !== 'interview')
-          continue;
+        const previous = ordered[ordered.indexOf(event) - 1];
         const progress = emailProgress(
           event === latest
             ? existing
-            : { status: event.status || 'Applied', interviewRound: event.interviewRound },
+            : { status: previous?.status || 'Applied', interviewRound: previous?.interviewRound },
           classification,
         );
         const round =
-          classification.category === 'interview'
-            ? Math.max(event.interviewRound || 1, eventRound(progress, classification) || 1)
-            : eventRound(progress, classification);
+          progress.status === 'Interview' && classification.category === 'interview'
+            ? Math.max(
+                event.status === 'Interview' ? event.interviewRound || 1 : 1,
+                eventRound(progress) || 1,
+              )
+            : eventRound(progress);
         if (
           event.type !== classification.category ||
           event.status !== progress.status ||
@@ -163,6 +183,7 @@ export class Tracker {
             existing.interviewRound !== progress.interviewRound)
         ) {
           Object.assign(existing, progress);
+          if (existing.status !== 'Interview') delete existing.interviewRound;
           changed = true;
         }
       }
@@ -200,10 +221,11 @@ export class Tracker {
     statusOverride?: Status,
   ) {
     Object.assign(app, emailProgress(app, classification, statusOverride));
+    if (app.status !== 'Interview') delete app.interviewRound;
     if (!app.jobId && classification.jobId && classification.category === 'confirmation')
       app.jobId = classification.jobId;
     app.lastActivityAt = app.updatedAt = this.now();
-    const round = eventRound(app, classification);
+    const round = eventRound(app);
     app.events.push({
       at: this.now(),
       type: classification.category,
