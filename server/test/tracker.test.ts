@@ -177,6 +177,9 @@ describe('matching', () => {
     expect(match.candidates[0].applicationId).toBe(app.id);
     expect(match.confident).toBeUndefined();
     expect(
+      matchApplications([app, other], { ...result, jobId: app.jobId }, '').confident?.id,
+    ).toBe(app.id);
+    expect(
       matchApplications([app, { ...other, title: app.title }], result, '').confident,
     ).toBeUndefined();
     expect(
@@ -267,6 +270,21 @@ describe('matching', () => {
     const match = matchApplications([app, other], result, 'Glean position');
     expect(match.confident).toBeUndefined();
   });
+  it.each(['Glean', ''])(
+    'queues a different employer’s job ID for review when the classified company is %j',
+    async (company) => {
+      const { capture, store, tracker } = setup();
+      const app = await capture();
+      await store.saveApplication({ ...app, id: 'glean', company: 'Glean', jobId: '' });
+      const notice = { ...email, from: 'Glean <jobs@glean.com>' };
+
+      expect(await tracker.receive(notice, { ...result, company, jobId: app.jobId })).toBe(
+        'review',
+      );
+      expect(store.apps.map((item) => item.status)).toEqual(['Applied', 'Applied']);
+      expect(store.reviews[0].candidates[0].applicationId).toBe('glean');
+    },
+  );
   it('reviews clearly different roles when there are multiple applications at the company', async () => {
     const app = await setup().capture();
     const match = matchApplications(
