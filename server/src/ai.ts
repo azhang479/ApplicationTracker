@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { z } from 'zod';
-import { AI, classificationSchema, jobSchema } from './domain.js';
+import { AI, classificationSchema, jobSchema, roleTypeSchema } from './domain.js';
 import { tailorOutputSchema } from './resume-domain.js';
 
 const string = { type: Type.STRING };
@@ -14,6 +14,7 @@ const salary = z.preprocess((value) => {
 const extractedJob = jobSchema.omit({ url: true }).extend({
   company: z.string().trim().min(1).catch('Unknown company'),
   title: z.string().trim().catch(''),
+  roleType: roleTypeSchema.catch('full-time'),
   jobId: z.string().catch(''),
   location: z.string().catch(''),
   workMode: jobSchema.shape.workMode.catch('unknown'),
@@ -60,11 +61,12 @@ export class VertexAI implements AI {
   async extract(input: { url: string; pageTitle: string; text: string }) {
     const fields = extractedJob.parse(
       await this.generate(
-        'Extract this job posting. If no salary is posted, estimate from title, level and location and set salaryIsEstimated=true. Use empty strings for missing jobId/location. Return concise summary and requirements.',
+        'Extract this job posting. Classify the advertised role as internship if the title or description advertises an internship (including a full-time internship), or describes a short student placement such as a 2–4 month term. Use full-time otherwise. Ignore mentions of past internships, probation periods, and short contracts without internship context. If no salary is posted, estimate from title, level and location and set salaryIsEstimated=true. Use empty strings for missing jobId/location. Return concise summary and requirements.',
         JSON.stringify(input),
         {
           company: string,
           title: string,
+          roleType: { ...string, enum: roleTypeSchema.options },
           jobId: string,
           location: string,
           workMode: { ...string, enum: ['remote', 'hybrid', 'onsite', 'unknown'] },

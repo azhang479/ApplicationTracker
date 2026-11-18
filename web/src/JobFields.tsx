@@ -1,8 +1,9 @@
-import type { Job } from './types';
+import { roleTypeLabels, roleTypeOf, type Job, type RoleType } from './types';
 
 export const blankJob: Job = {
   company: '',
   title: '',
+  roleType: 'full-time',
   jobId: '',
   url: '',
   location: '',
@@ -41,7 +42,20 @@ export function JobFields({ value, onChange }: { value: Job; onChange: (value: J
         Job posting link
         <input required type="url" value={value.url} onChange={(e) => set('url', e.target.value)} />
       </label>
-      <label className="col-span-2">
+      <label>
+        Role type
+        <select
+          value={roleTypeOf(value)}
+          onChange={(e) => set('roleType', e.target.value as RoleType)}
+        >
+          {Object.entries(roleTypeLabels).map(([type, label]) => (
+            <option key={type} value={type}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
         Work arrangement
         <select
           value={value.workMode}

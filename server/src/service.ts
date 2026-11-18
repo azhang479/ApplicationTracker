@@ -55,6 +55,7 @@ export class Tracker {
     const now = this.now();
     return {
       ...fields,
+      roleType: fields.roleType ?? 'full-time',
       id: randomUUID(),
       status: 'Applied',
       appliedAt: now,

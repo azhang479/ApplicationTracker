@@ -1,4 +1,4 @@
-import { Firestore, Transaction } from '@google-cloud/firestore';
+import { Firestore, Transaction, type QueryDocumentSnapshot } from '@google-cloud/firestore';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Application, GmailConfig, Review, Store } from './domain.js';
 import type { Resume } from './resume-domain.js';
@@ -10,6 +10,12 @@ type Context = {
   transaction: Transaction;
   resumes?: Map<string, Resume>;
 };
+
+function applicationFromDocument(doc: QueryDocumentSnapshot): Application {
+  const app = doc.data() as Application;
+  return { ...app, id: doc.id, roleType: app.roleType ?? 'full-time' };
+}
+
 export class FirestoreStore implements Store {
   private context = new AsyncLocalStorage<Context>();
   constructor(private db = new Firestore()) {}
@@ -19,7 +25,7 @@ export class FirestoreStore implements Store {
       const apps = await transaction.get(this.db.collection('applications'));
       const reviews = await transaction.get(this.db.collection('reviewItems'));
       const ctx: Context = {
-        apps: new Map(apps.docs.map((d) => [d.id, { ...d.data(), id: d.id } as Application])),
+        apps: new Map(apps.docs.map((doc) => [doc.id, applicationFromDocument(doc)])),
         reviews: new Map(reviews.docs.map((d) => [d.id, { ...d.data(), id: d.id } as Review])),
         writes: [],
         transaction,
@@ -32,9 +38,7 @@ export class FirestoreStore implements Store {
   async listApplications() {
     const ctx = this.context.getStore();
     if (ctx) return [...ctx.apps.values()];
-    return (await this.db.collection('applications').get()).docs.map(
-      (d) => ({ ...d.data(), id: d.id }) as Application,
-    );
+    return (await this.db.collection('applications').get()).docs.map(applicationFromDocument);
   }
   async listResumes() {
     const ctx = this.context.getStore();

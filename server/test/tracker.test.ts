@@ -117,8 +117,19 @@ describe('capture', () => {
     const { tracker, ai } = setup();
     const app = await tracker.capture({ url: job.url, pageTitle: '', text: 'a'.repeat(50000) });
     expect(app.status).toBe('Applied');
+    expect(app.roleType).toBe('full-time');
     expect(app.events[0].type).toBe('applied');
     expect(vi.mocked(ai.extract).mock.calls[0][0].text.length).toBe(20000);
+  });
+  it('saves the extracted role type and lets the owner correct it', async () => {
+    const { tracker, ai, capture, store } = setup();
+    vi.mocked(ai.extract).mockResolvedValue({ ...job, roleType: 'internship' });
+    const app = await capture();
+    expect(app.roleType).toBe('internship');
+    await tracker.patch(app.id, patchSchema.parse({ roleType: 'full-time' }));
+    expect(store.apps[0]).toMatchObject({ roleType: 'full-time', status: 'Applied' });
+    expect((await capture()).roleType).toBe('full-time');
+    expect(() => patchSchema.parse({ roleType: 'contract' })).toThrow();
   });
   it.each([0, 100, 19999, 20000, 20001])(
     'caps a %s-character posting without changing shorter input',

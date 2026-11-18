@@ -11,9 +11,12 @@ export const statuses = [
   'Withdrawn',
   'Ghosted',
 ] as const;
+export const roleTypeSchema = z.enum(['full-time', 'internship']);
+export type RoleType = z.infer<typeof roleTypeSchema>;
 export const jobSchema = z.object({
   company: z.string().min(1),
   title: z.string().min(1),
+  roleType: roleTypeSchema.optional(),
   jobId: z.string().default(''),
   url: z.string().url(),
   location: z.string().default(''),
