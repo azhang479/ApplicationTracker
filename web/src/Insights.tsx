@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { sankey, sankeyLinkHorizontal, type SankeyNode } from 'd3-sankey';
+import { RoleTypeFilter, type RoleTypeSelection } from './RoleTypeFilter';
 import {
   buildFlow,
   applicationsForStage,
@@ -201,9 +202,13 @@ function FlowChart({
 export function Insights({
   apps,
   openApplication,
+  roleType,
+  onRoleTypeChange,
 }: {
   apps: Application[];
   openApplication: (app: Application) => void;
+  roleType: RoleTypeSelection;
+  onRoleTypeChange: (value: RoleTypeSelection) => void;
 }) {
   const [days, setDays] = useState<AppliedWindow>(0);
   const [selectedStage, setSelectedStage] = useState<FlowStage | null>(null);
@@ -213,25 +218,34 @@ export function Insights({
   const activeStage = flow.nodes.some((node) => node.id === selectedStage) ? selectedStage : null;
   return (
     <section aria-label="Application insights">
-      <div
-        className="application-filters flex items-center flex-wrap gap-2 mb-5"
-        role="group"
-        aria-label="Applied in"
-      >
-        <span className="text-xs font-medium text-slate-500 mr-1">Applied in:</span>
-        {([0, 30, 90] as const).map((value) => (
-          <button
-            key={value}
-            className={`chip ${days === value ? 'chip-active' : ''}`}
-            aria-pressed={days === value}
-            onClick={() => {
-              setDays(value);
-              setSelectedStage(null);
-            }}
-          >
-            {value ? `Last ${value} days` : 'All time'}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-5">
+        <div
+          className="application-filters flex items-center flex-wrap gap-2"
+          role="group"
+          aria-label="Applied in"
+        >
+          <span className="text-xs font-medium text-slate-500 mr-1">Applied in:</span>
+          {([0, 30, 90] as const).map((value) => (
+            <button
+              key={value}
+              className={`chip ${days === value ? 'chip-active' : ''}`}
+              aria-pressed={days === value}
+              onClick={() => {
+                setDays(value);
+                setSelectedStage(null);
+              }}
+            >
+              {value ? `Last ${value} days` : 'All time'}
+            </button>
+          ))}
+        </div>
+        <RoleTypeFilter
+          value={roleType}
+          onChange={(value) => {
+            onRoleTypeChange(value);
+            setSelectedStage(null);
+          }}
+        />
       </div>
       <div className="workspace-stats grid grid-cols-3 gap-3">
         {[

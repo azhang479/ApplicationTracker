@@ -32,6 +32,7 @@ export function Drawer({
   const [job, setJob] = useState<Job>({
     company: app.company,
     title: app.title,
+    roleType: app.roleType,
     jobId: app.jobId,
     url: app.url,
     location: app.location,

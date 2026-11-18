@@ -24,6 +24,7 @@ const input = {
 const fields = {
   company: 'Acme',
   title: 'Engineer',
+  roleType: 'full-time',
   jobId: '123',
   location: 'NY',
   workMode: 'hybrid',
@@ -105,6 +106,21 @@ describe('Gemini extraction', () => {
     expect(schema.properties).not.toHaveProperty('url');
     expect(schema.required).not.toContain('url');
   });
+  it('requests a role type using posting language and student placement duration', async () => {
+    const posting = { ...input, text: 'Join our student program for a 3-month summer placement.' };
+    generate.mockResolvedValue({
+      text: JSON.stringify({ ...fields, roleType: 'internship' }),
+    });
+    expect((await ai.extract(posting)).roleType).toBe('internship');
+    const request = generate.mock.calls[0][0];
+    expect(JSON.parse(request.contents)).toEqual(posting);
+    expect(request.config.responseSchema.properties.roleType.enum).toEqual([
+      'full-time',
+      'internship',
+    ]);
+    expect(request.config.responseSchema.required).toContain('roleType');
+    expect(request.config.systemInstruction).toContain('2–4 month term');
+  });
   it.each(['', 'not a url', 'https://wrong.example/job'])(
     'ignores model URL %s and coerces numeric salaries',
     async (url) => {
@@ -115,7 +131,13 @@ describe('Gemini extraction', () => {
     },
   );
   it.each(['', 'unexpected', null])('defaults unknown enum values %s', async (value) => {
-    const job = await extract({ ...fields, workMode: value, salaryPeriod: value });
+    const job = await extract({
+      ...fields,
+      roleType: value,
+      workMode: value,
+      salaryPeriod: value,
+    });
+    expect(job.roleType).toBe('full-time');
     expect(job.workMode).toBe('unknown');
     expect(job.salaryPeriod).toBe('year');
   });
@@ -123,6 +145,7 @@ describe('Gemini extraction', () => {
     expect(await extract({})).toEqual({
       company: 'Unknown company',
       title: input.pageTitle,
+      roleType: 'full-time',
       url: input.url,
       jobId: '',
       location: '',

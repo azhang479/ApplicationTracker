@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SignIn } from './auth';
 import { Drawer } from './Drawer';
 import { AssessmentEmailLink } from './AssessmentEmailLink';
@@ -7,6 +7,7 @@ import { ReviewCard } from './ReviewCard';
 import { Resumes } from './Resumes';
 import { Tailor } from './Tailor';
 import { Insights } from './Insights';
+import { RoleTypeFilter, type RoleTypeSelection } from './RoleTypeFilter';
 import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
   Application,
@@ -16,6 +17,8 @@ import {
   statuses,
   statusColors,
   statusLabel,
+  roleTypeLabels,
+  roleTypeOf,
   salary,
   formatDate,
 } from './types';
@@ -37,6 +40,7 @@ export function App() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [gmail, setGmail] = useState<GmailStatus>({ connected: false, watchExpiration: null });
   const [filter, setFilter] = useState('All');
+  const [roleType, setRoleType] = useState<RoleTypeSelection>('all');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('lastActivityAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -44,6 +48,10 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const roleApps = useMemo(
+    () => (roleType === 'all' ? apps : apps.filter((app) => roleTypeOf(app) === roleType)),
+    [apps, roleType],
+  );
   const onToken = useCallback((next: string) => {
     sessionStorage.setItem('idToken', next);
     setToken(next);
@@ -149,7 +157,7 @@ export function App() {
       <Tailor id={decodeURIComponent(tailorPath[1])} api={api} token={token} signOut={signOut} />
     );
   const visible = sortApplications(
-    apps.filter(
+    roleApps.filter(
       (app) =>
         (filter === 'All' || app.status === filter) &&
         (app.company + ' ' + app.title).toLowerCase().includes(search.toLowerCase()),
@@ -276,8 +284,11 @@ export function App() {
                 <p className="text-sm text-slate-400 mt-1">From first click to final offer.</p>
               </div>
               <span className="text-xs text-slate-400">
-                {visible.length} of {apps.length} applications
+                {visible.length} of {roleApps.length} applications
               </span>
+            </div>
+            <div className="mb-3">
+              <RoleTypeFilter value={roleType} onChange={setRoleType} />
             </div>
             <div
               className="application-filters flex flex-wrap gap-2 mb-5"
@@ -294,8 +305,8 @@ export function App() {
                   {status}
                   <span className="ml-2 opacity-60">
                     {status === 'All'
-                      ? apps.length
-                      : apps.filter((app) => app.status === status).length}
+                      ? roleApps.length
+                      : roleApps.filter((app) => app.status === status).length}
                   </span>
                 </button>
               ))}
@@ -376,7 +387,12 @@ export function App() {
                                 {app.company}
                                 <span className="sr-only"> — edit application</span>
                               </button>
-                              <p className="text-slate-500 mt-1">{app.title}</p>
+                              <p className="text-slate-500 mt-1">
+                                {app.title}
+                                <span className="ml-2 text-xs text-slate-400">
+                                  · {roleTypeLabels[roleTypeOf(app)]}
+                                </span>
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -414,7 +430,7 @@ export function App() {
                   </h3>
                   <p className="text-slate-500 text-sm mt-2">
                     {apps.length
-                      ? 'Try another company, job title, or status.'
+                      ? 'Try another company, job title, status, or role type.'
                       : 'Use the Chrome extension on a job posting to track your first application.'}
                   </p>
                 </div>
@@ -447,7 +463,14 @@ export function App() {
             )}
           </section>
         )}
-        {!loading && tab === 'Insights' && <Insights apps={apps} openApplication={setSelected} />}
+        {!loading && tab === 'Insights' && (
+          <Insights
+            apps={roleApps}
+            openApplication={setSelected}
+            roleType={roleType}
+            onRoleTypeChange={setRoleType}
+          />
+        )}
         {!loading && tab === 'Settings' && (
           <>
             <section className="card max-w-2xl p-7">

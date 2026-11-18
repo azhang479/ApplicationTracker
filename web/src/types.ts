@@ -1,4 +1,15 @@
-export type { Application, Job, Review, Status } from '../../server/src/domain';
+import type { Job, RoleType } from '../../server/src/domain';
+export type { Application, Job, Review, RoleType, Status } from '../../server/src/domain';
+
+export const roleTypeLabels: Record<RoleType, string> = {
+  'full-time': 'Full-time',
+  internship: 'Internship',
+};
+
+export function roleTypeOf(job: Pick<Job, 'roleType'>): RoleType {
+  return job.roleType ?? 'full-time';
+}
+
 export function statusLabel(app: { status: string; interviewRound?: number }) {
   return app.status === 'Interview' ? `Interview · R${app.interviewRound ?? 1}` : app.status;
 }
