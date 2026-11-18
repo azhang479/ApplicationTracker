@@ -176,9 +176,9 @@ describe('matching', () => {
     const match = matchApplications([app, other], result, '');
     expect(match.candidates[0].applicationId).toBe(app.id);
     expect(match.confident).toBeUndefined();
-    expect(
-      matchApplications([app, other], { ...result, jobId: app.jobId }, '').confident?.id,
-    ).toBe(app.id);
+    expect(matchApplications([app, other], { ...result, jobId: app.jobId }, '').confident?.id).toBe(
+      app.id,
+    );
     expect(
       matchApplications([app, { ...other, title: app.title }], result, '').confident,
     ).toBeUndefined();
