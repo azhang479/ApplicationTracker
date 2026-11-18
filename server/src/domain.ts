@@ -181,14 +181,17 @@ export function matchApplications(apps: Application[], result: Classification, s
     })
     .sort((a, b) => b.score - a.score);
   const companyMatches = ranked.filter((r) => r.sameCompany);
-  const best = companyMatches[0];
   let confident: Application | undefined;
   if (exact.length === 1) {
-    confident = exact[0];
-  } else if (exact.length === 0 && best) {
-    if (companyMatches.length === 1) {
-      confident = best.app;
-    }
+    // Requisition IDs can be reused by different employers.
+    const [app] = exact;
+    const hasClassifiedCompany = company !== '' && company !== 'unknown';
+    const compatible = hasClassifiedCompany
+      ? sameCompany(normalize(app.company), company)
+      : companyMatches.length === 0 || companyMatches.some((match) => match.app.id === app.id);
+    if (compatible) confident = app;
+  } else if (exact.length === 0 && companyMatches.length === 1) {
+    confident = companyMatches[0].app;
   }
   return {
     confident,
