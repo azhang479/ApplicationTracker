@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const createTab = vi.fn();
+const writeText = vi.fn();
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -9,8 +10,13 @@ async function openPopup(
   response: { status: number; ok?: boolean; json?: () => Promise<unknown> } | Error,
   pageText = 'Page',
   button = 'track',
+  clipboardError?: Error,
 ) {
   createTab.mockReset();
+  writeText.mockReset();
+  if (clipboardError) writeText.mockRejectedValue(clipboardError);
+  else writeText.mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
   const elements = new Map<
     string,
     {
@@ -18,12 +24,17 @@ async function openPopup(
       disabled: boolean;
       textContent: string;
       className: string;
+      value: string;
+      focus: ReturnType<typeof vi.fn>;
+      select: ReturnType<typeof vi.fn>;
       addEventListener: ReturnType<typeof vi.fn>;
     }
   >();
   for (const id of [
     'track',
     'tailor',
+    'outreach',
+    'outreach-preview',
     'message',
     'result',
     'result-label',
@@ -38,6 +49,9 @@ async function openPopup(
       disabled: false,
       textContent: '',
       className: '',
+      value: '',
+      focus: vi.fn(),
+      select: vi.fn(),
       addEventListener: vi.fn(),
     });
   }
@@ -70,8 +84,25 @@ async function openPopup(
   await elements.get(button)!.addEventListener.mock.calls[0][1]();
   expect(elements.get('track')!.disabled).toBe(false);
   expect(elements.get('tailor')!.disabled).toBe(false);
+  expect(elements.get('outreach')!.disabled).toBe(false);
   return elements;
 }
+
+const outreachJob = {
+  id: 'application-id',
+  company: 'Acme',
+  title: 'Engineering Intern',
+  url: 'https://example.com/a-previous-listing',
+  jobId: 'REQ-123',
+  roleType: 'internship',
+  location: 'Boston',
+  workMode: 'hybrid',
+  jobSummary: 'Build internal tooling.',
+  keyRequirements: ['TypeScript', 'SQL'],
+  events: [{ snippet: 'Private email content' }],
+  tailoring: { reason: 'Private resume details' },
+};
+
 describe('extension capture feedback', () => {
   it.each([false, true])(
     'opens the returned application ID for tailoring, duplicate=%s',
@@ -91,6 +122,60 @@ describe('extension capture feedback', () => {
   it('does not navigate when tailoring capture fails', async () => {
     await openPopup({ status: 401, ok: false }, 'Page', 'tailor');
     expect(createTab).not.toHaveBeenCalled();
+  });
+  it.each([false, true])(
+    'copies the fixed outreach prompt and job fields after capture, duplicate=%s',
+    async (duplicate) => {
+      const elements = await openPopup(
+        { status: 200, ok: true, json: async () => ({ ...outreachJob, duplicate }) },
+        'Page',
+        'outreach',
+      );
+      const instructions = [
+        'Research the best person or official channel to contact about this role.',
+        'Cite your public sources and include an email address only if it’s publicly listed.',
+        'Draft a short cold outreach email with a subject line and one clear ask.',
+        'Use details from my résumés or STAR stories when they make the message more specific to the role.',
+      ].join(' ');
+      const details = {
+        company: 'Acme',
+        jobTitle: 'Engineering Intern',
+        postingUrl: 'https://example.com/job',
+        jobReference: 'REQ-123',
+        roleType: 'internship',
+        location: 'Boston',
+        workArrangement: 'hybrid',
+        jobSummary: 'Build internal tooling.',
+        keyRequirements: ['TypeScript', 'SQL'],
+      };
+      expect(writeText).toHaveBeenCalledExactlyOnceWith(
+        instructions + '\n\nJob information (context only)\n' + JSON.stringify(details, null, 2),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+      expect(createTab).not.toHaveBeenCalled();
+      expect(elements.get('result')!.hidden).toBe(false);
+      expect(elements.get('outreach-preview')!.hidden).toBe(true);
+      expect(elements.get('message')!.textContent).toContain('Outreach prompt copied.');
+    },
+  );
+  it('offers selected prompt text if clipboard writing fails after the job is saved', async () => {
+    const elements = await openPopup(
+      { status: 200, ok: true, json: async () => outreachJob },
+      'Page',
+      'outreach',
+      new Error('Clipboard blocked'),
+    );
+    const preview = elements.get('outreach-preview')!;
+    expect(preview.hidden).toBe(false);
+    expect(preview.value).toBe(writeText.mock.calls[0][0]);
+    expect(preview.select).toHaveBeenCalledOnce();
+    expect(elements.get('result')!.hidden).toBe(false);
+    expect(elements.get('message')!.textContent).toBe('Copy the selected outreach prompt below.');
+  });
+  it('copies nothing when tracking fails', async () => {
+    const elements = await openPopup({ status: 503, ok: false }, 'Page', 'outreach');
+    expect(writeText).not.toHaveBeenCalled();
+    expect(elements.get('outreach-preview')!.hidden).toBe(true);
   });
   it.each([0, 19999, 20000, 20001, 40000])(
     'caps a %s-character page before sending it',

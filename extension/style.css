@@ -69,7 +69,8 @@ button:disabled {
 }
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+#outreach-preview:focus-visible {
   outline: 2px solid #64748b;
   outline-offset: 3px;
 }
@@ -85,7 +86,8 @@ input:focus-visible {
 .actions {
   margin-top: 24px;
 }
-#tailor {
+#tailor,
+#outreach {
   margin-top: 10px;
 }
 footer {
@@ -136,7 +138,8 @@ label {
   font-weight: 550;
   margin-top: 20px;
 }
-input {
+input,
+#outreach-preview {
   display: block;
   width: 100%;
   margin-top: 8px;
@@ -144,6 +147,10 @@ input {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font: inherit;
+}
+#outreach-preview {
+  font-size: 13px;
+  resize: vertical;
 }
 [hidden] {
   display: none !important;
