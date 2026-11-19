@@ -1,18 +1,35 @@
-import { settings, salary } from './shared.js';
+import { settings, salary, outreachPrompt } from './shared.js';
 
 const JOB_TEXT_LIMIT = 20_000;
 
 const track = document.getElementById('track');
 const tailor = document.getElementById('tailor');
+const outreach = document.getElementById('outreach');
+const captureButtons = [track, tailor, outreach];
 const message = document.getElementById('message');
+const outreachPreview = document.getElementById('outreach-preview');
+
 function showError(error) {
   message.className = 'error';
   message.textContent = error.message || 'Something went wrong. Please try again.';
 }
-async function capture(openTailor = false) {
-  track.disabled = true;
-  tailor.disabled = true;
+async function copyOutreachPrompt(prompt) {
+  try {
+    await navigator.clipboard.writeText(prompt);
+    message.textContent = 'Outreach prompt copied. Paste it into ChatGPT.';
+  } catch {
+    message.textContent = 'Copy the selected outreach prompt below.';
+    outreachPreview.value = prompt;
+    outreachPreview.hidden = false;
+    outreachPreview.focus();
+    outreachPreview.select();
+  }
+}
+async function capture(action = 'track') {
+  captureButtons.forEach((button) => (button.disabled = true));
   document.getElementById('result').hidden = true;
+  outreachPreview.hidden = true;
+  outreachPreview.value = '';
   message.className = '';
   message.textContent = 'Extracting… (can take ~10s)';
   try {
@@ -55,17 +72,20 @@ async function capture(openTailor = false) {
     document.getElementById('title').textContent = job.title;
     document.getElementById('salary').textContent = salary(job);
     document.getElementById('result').hidden = false;
-    if (openTailor)
+    if (action === 'tailor') {
       await chrome.tabs.create({ url: config.url + '/tailor/' + encodeURIComponent(job.id) });
+    } else if (action === 'outreach') {
+      await copyOutreachPrompt(outreachPrompt(job, injection.result.url));
+    }
   } catch (error) {
     showError(error);
   } finally {
-    track.disabled = false;
-    tailor.disabled = false;
+    captureButtons.forEach((button) => (button.disabled = false));
   }
 }
 track.addEventListener('click', () => capture());
-tailor.addEventListener('click', () => capture(true));
+tailor.addEventListener('click', () => capture('tailor'));
+outreach.addEventListener('click', () => capture('outreach'));
 document.getElementById('dashboard').addEventListener('click', async () => {
   try {
     const config = await settings();

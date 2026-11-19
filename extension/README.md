@@ -10,5 +10,8 @@ open until extraction finishes (usually about 10 seconds). Chrome closes popups
 when you click away, which can interrupt the request; retrying is safe because
 capture deduplicates jobs. **Open dashboard** opens your workspace in a new tab.
 
+**Track & copy outreach prompt** saves the job and copies the outreach prompt
+and job details. Paste it into your ChatGPT outreach chat.
+
 The key is stored in chrome.storage.sync in your own Chrome profile. Do not share
 your Chrome profile or API key. Only Cloud Run and localhost:8080 have host access.

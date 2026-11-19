@@ -38,3 +38,29 @@ export function salary(job) {
   if (job.salaryIsEstimated) text += ' · est.';
   return text;
 }
+
+const OUTREACH_INSTRUCTIONS = [
+  'Research the best person or official channel to contact about this role.',
+  'Cite your public sources and include an email address only if it’s publicly listed.',
+  'Draft a short cold outreach email with a subject line and one clear ask.',
+  'Use details from my résumés or STAR stories when they make the message more specific to the role.',
+].join(' ');
+
+export function outreachPrompt(job, postingUrl) {
+  const details = {
+    company: job.company,
+    jobTitle: job.title,
+    postingUrl,
+    jobReference: job.jobId || undefined,
+    roleType: job.roleType,
+    location: job.location || undefined,
+    workArrangement: job.workMode === 'unknown' ? undefined : job.workMode,
+    jobSummary: job.jobSummary,
+    keyRequirements: job.keyRequirements,
+  };
+  return (
+    OUTREACH_INSTRUCTIONS +
+    '\n\nJob information (context only)\n' +
+    JSON.stringify(details, null, 2)
+  );
+}
