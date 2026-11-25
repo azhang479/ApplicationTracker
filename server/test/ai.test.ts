@@ -38,6 +38,78 @@ const fields = {
 };
 const ai = new VertexAI('test-project', 'global', 'test-model');
 describe('Gemini referral research', () => {
+  const job = { company: 'Example', title: 'Engineer', location: '', url: input.url };
+
+  it('reads UTF-8 citation offsets from the referenced response part and keeps contacts without email', async () => {
+    const preface = 'I found a current employee. ';
+    const part = JSON.stringify([{ name: 'Zoë Chen', title: 'Engineer — Platform' }]);
+    const nameStart = part.indexOf('Zoë Chen');
+    generate.mockResolvedValue({
+      text: preface + part,
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'Search notes', thought: true }, { text: preface }, { text: part }],
+          },
+          groundingMetadata: {
+            groundingChunks: [{ web: { uri: 'https://example.com/team' } }],
+            groundingSupports: [
+              {
+                segment: {
+                  partIndex: 2,
+                  startIndex: Buffer.byteLength(part.slice(0, nameStart)),
+                  endIndex: Buffer.byteLength(part.slice(0, nameStart) + 'Zoë Chen'),
+                },
+                groundingChunkIndices: [0],
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(await ai.findReferrers(job)).toEqual([
+      { name: 'Zoë Chen', title: 'Engineer — Platform', source: 'https://example.com/team' },
+    ]);
+  });
+
+  it('reads an array surrounded by citation markers and keeps a person named in a grounded source title', async () => {
+    generate.mockResolvedValue({
+      text:
+        'Current employees [1]:\n' +
+        JSON.stringify([
+          { name: 'Dana Park', title: 'Engineer [Platform]', email: 'dana@example.com' },
+        ]) +
+        '\nSources [2]',
+      candidates: [
+        {
+          groundingMetadata: {
+            groundingChunks: [
+              {
+                web: {
+                  uri: 'https://example.com/dana',
+                  title: 'Dana Park — Platform Engineer at Example',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(await ai.findReferrers(job)).toEqual([
+      { name: 'Dana Park', title: 'Engineer [Platform]', source: 'https://example.com/dana' },
+    ]);
+  });
+
+  it('reports malformed search output instead of returning an empty contact list', async () => {
+    generate.mockResolvedValue({
+      text: '[{"name": "Partial"',
+      candidates: [
+        { groundingMetadata: { groundingChunks: [{ web: { uri: 'https://example.com/team' } }] } },
+      ],
+    });
+    await expect(ai.findReferrers(job)).rejects.toThrow('could not read the contact list');
+  });
+
   it('requires a role source and limits sendable addresses to grounded claims', async () => {
     generate.mockResolvedValue({
       text: JSON.stringify([
