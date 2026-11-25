@@ -35,13 +35,14 @@ OAUTH_SECRET=application-tracker-oauth-client-secret
 TOPIC="projects/$PROJECT_ID/topics/gmail-notifications"
 SUBSCRIPTION=gmail-notifications-push
 JOB=application-tracker-daily
+REFERRAL_BUCKET="${PROJECT_ID}-tracker-referral-resume"
 
 printf 'Enabling APIs in %s...\n' "$PROJECT_ID"
 "${GCLOUD[@]}" services enable run.googleapis.com firestore.googleapis.com \
   pubsub.googleapis.com cloudscheduler.googleapis.com gmail.googleapis.com \
   aiplatform.googleapis.com secretmanager.googleapis.com artifactregistry.googleapis.com \
   cloudbuild.googleapis.com iam.googleapis.com iamcredentials.googleapis.com \
-  cloudresourcemanager.googleapis.com
+  cloudresourcemanager.googleapis.com storage.googleapis.com
 PROJECT_NUMBER="$("${GCLOUD[@]}" projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 
 DATABASES="$("${GCLOUD[@]}" firestore databases list --format='value(name)')"
@@ -72,6 +73,16 @@ grant_role "$RUNTIME" roles/datastore.user
 grant_role "$RUNTIME" roles/aiplatform.user
 grant_role "$RUNTIME" roles/secretmanager.secretAccessor
 grant_role "$BUILDER" roles/run.builder
+
+REFERRAL_BUCKETS="$("${GCLOUD[@]}" storage buckets list --filter="name=$REFERRAL_BUCKET" --format='value(name)')"
+if [[ -z "$REFERRAL_BUCKETS" ]]; then
+  "${GCLOUD[@]}" storage buckets create "gs://$REFERRAL_BUCKET" --location="$REGION" \
+    --uniform-bucket-level-access --public-access-prevention
+else
+  "${GCLOUD[@]}" storage buckets update "gs://$REFERRAL_BUCKET" --public-access-prevention
+fi
+"${GCLOUD[@]}" storage buckets add-iam-policy-binding "gs://$REFERRAL_BUCKET" \
+  --member="serviceAccount:$RUNTIME" --role=roles/storage.objectUser >/dev/null
 
 # Only initialize an empty secret; never replace an existing extension key.
 ensure_secret() {
@@ -137,7 +148,7 @@ fi
   --service-account="$RUNTIME" \
   --build-service-account="projects/$PROJECT_ID/serviceAccounts/$BUILDER" \
   --allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --timeout=900s \
-  --update-env-vars="^|^GOOGLE_CLOUD_PROJECT=$PROJECT_ID|GCP_LOCATION=$REGION|GEMINI_LOCATION=$GEMINI_LOCATION|OWNER_EMAIL=$OWNER_EMAIL|OAUTH_CLIENT_ID=$CLIENT_ID|PUBLIC_URL=$PUBLIC_URL|PUBSUB_TOPIC=$TOPIC|PUSH_SERVICE_ACCOUNT=$INVOKER|GEMINI_MODEL=$GEMINI_MODEL|GHOSTED_AFTER_DAYS=45" \
+  --update-env-vars="^|^GOOGLE_CLOUD_PROJECT=$PROJECT_ID|GCP_LOCATION=$REGION|GEMINI_LOCATION=$GEMINI_LOCATION|OWNER_EMAIL=$OWNER_EMAIL|OAUTH_CLIENT_ID=$CLIENT_ID|PUBLIC_URL=$PUBLIC_URL|PUBSUB_TOPIC=$TOPIC|PUSH_SERVICE_ACCOUNT=$INVOKER|GEMINI_MODEL=$GEMINI_MODEL|GHOSTED_AFTER_DAYS=45|REFERRAL_RESUME_BUCKET=$REFERRAL_BUCKET" \
   --update-secrets="EXTENSION_API_KEY=$KEY_SECRET:$KEY_VERSION,OAUTH_CLIENT_SECRET=$OAUTH_SECRET:$OAUTH_VERSION"
 URL="$("${GCLOUD[@]}" run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
 if [[ "$PUBLIC_URL" != "$URL" ]]; then

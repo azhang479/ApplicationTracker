@@ -16,9 +16,14 @@ import {
   matchApplications,
   normalize,
   statuses,
+  isPreApplication,
 } from './domain.js';
 
 const JOB_TEXT_LIMIT = 20_000;
+function appliedDate(email: Email, fallback: string) {
+  const date = Date.parse(email.date);
+  return Number.isFinite(date) ? new Date(date).toISOString() : fallback;
+}
 function eventRound(progress: Pick<Application, 'status' | 'interviewRound'>) {
   return progress.status === 'Interview' ? progress.interviewRound || 1 : undefined;
 }
@@ -51,25 +56,27 @@ export class Tracker {
     public ai: AI,
     private now = () => new Date().toISOString(),
   ) {}
-  private create(fields: Job): Application {
+  private create(fields: Job, referral = false): Application {
     const now = this.now();
+    const status = referral ? 'Looking for referral' : 'Applied';
     return {
       ...fields,
       roleType: fields.roleType ?? 'full-time',
       id: randomUUID(),
-      status: 'Applied',
-      appliedAt: now,
+      status,
+      appliedAt: referral ? '' : now,
       lastActivityAt: now,
       createdAt: now,
       updatedAt: now,
-      events: [{ at: now, type: 'applied', status: 'Applied' }],
+      events: [{ at: now, type: referral ? 'referral_tracking' : 'applied', status }],
     };
   }
-  async capture(input: { url: string; pageTitle: string; text: string }) {
+  async capture(input: { url: string; pageTitle: string; text: string; intent?: 'referral' }) {
     const known = (await this.store.listApplications()).find((app) => app.url === input.url);
     if (known) return { ...known, duplicate: true };
+    const { url, pageTitle, text } = input;
     const fields = jobSchema.parse(
-      await this.ai.extract({ ...input, text: input.text.slice(0, JOB_TEXT_LIMIT) }),
+      await this.ai.extract({ url, pageTitle, text: text.slice(0, JOB_TEXT_LIMIT) }),
     );
     fields.url = input.url;
     return this.store.exclusive(async () => {
@@ -81,7 +88,7 @@ export class Tracker {
             normalize(a.company) === normalize(fields.company)),
       );
       if (existing) return { ...existing, duplicate: true };
-      const app = this.create(fields);
+      const app = this.create(fields, input.intent === 'referral');
       await this.store.saveApplication(app);
       return { ...app, duplicate: false };
     });
@@ -108,6 +115,8 @@ export class Tracker {
         app.lastActivityAt = now;
       }
       Object.assign(app, fields, { updatedAt: now });
+      if (isPreApplication(app.status)) app.appliedAt = '';
+      else if (status === 'Applied' && !app.appliedAt) app.appliedAt = now;
       if (app.status !== 'Interview') delete app.interviewRound;
       await this.store.saveApplication(app);
       return app;
@@ -183,6 +192,12 @@ export class Tracker {
           (existing.status !== progress.status ||
             existing.interviewRound !== progress.interviewRound)
         ) {
+          if (
+            isPreApplication(existing.status) &&
+            progress.status === 'Applied' &&
+            !existing.appliedAt
+          )
+            existing.appliedAt = appliedDate(email, this.now());
           Object.assign(existing, progress);
           if (existing.status !== 'Interview') delete existing.interviewRound;
           changed = true;
@@ -201,7 +216,12 @@ export class Tracker {
       classification,
       [email.from, email.subject, email.snippet, body].join('\n'),
     );
-    if (!confident) {
+    const preApplicationMismatch =
+      confident &&
+      isPreApplication(confident.status) &&
+      (classification.category !== 'confirmation' ||
+        (confident.jobId && classification.jobId && confident.jobId !== classification.jobId));
+    if (!confident || preApplicationMismatch) {
       await this.store.saveReview({
         id: email.id,
         email,
@@ -221,7 +241,11 @@ export class Tracker {
     classification: Classification,
     statusOverride?: Status,
   ) {
+    const wasPreApplication = isPreApplication(app.status);
     Object.assign(app, emailProgress(app, classification, statusOverride));
+    if (wasPreApplication && app.status === 'Applied' && !app.appliedAt) {
+      app.appliedAt = appliedDate(email, this.now());
+    }
     if (app.status !== 'Interview') delete app.interviewRound;
     if (!app.jobId && classification.jobId && classification.category === 'confirmation')
       app.jobId = classification.jobId;
@@ -239,6 +263,54 @@ export class Tracker {
       gmailLink: email.gmailLink,
     });
     await this.store.saveApplication(app);
+  }
+  async receiveReferralReply(
+    email: Email,
+    applicationId: string,
+    decision: 'ready' | 'review' | 'no_action',
+  ): Promise<EmailOutcome> {
+    return this.store.exclusive(async () => {
+      const app = (await this.store.listApplications()).find((item) => item.id === applicationId);
+      if (
+        !app ||
+        app.events.some((event) => matchesEmail(event, email)) ||
+        (await this.store.listReview()).some((review) => review.id === email.id)
+      )
+        return 'skipped';
+      const at = this.now();
+      if (decision === 'review' && isPreApplication(app.status)) {
+        await this.store.saveReview({
+          id: email.id,
+          email,
+          classification: {
+            isJobRelated: true,
+            category: 'referral_reply',
+            company: app.company,
+            title: app.title,
+            jobId: app.jobId,
+            summary: email.snippet,
+          },
+          candidates: [{ applicationId: app.id, company: app.company, title: app.title, score: 4 }],
+          resolved: false,
+          createdAt: at,
+        });
+        return 'review';
+      }
+      if (decision === 'ready' && isPreApplication(app.status)) app.status = 'Apply now';
+      app.events.push({
+        at,
+        type: 'referral_reply',
+        status: app.status,
+        gmailLink: email.gmailLink,
+        emailSubject: email.subject,
+        emailFrom: email.from,
+        emailDate: email.date,
+        snippet: email.snippet,
+      });
+      app.updatedAt = app.lastActivityAt = at;
+      await this.store.saveApplication(app);
+      return 'updated';
+    });
   }
   async resolve(id: string, action: z.infer<typeof resolveSchema>) {
     return this.store.exclusive(async () => {

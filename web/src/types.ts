@@ -1,5 +1,7 @@
 import type { Job, RoleType } from '../../server/src/domain';
 export type { Application, Job, Review, RoleType, Status } from '../../server/src/domain';
+import { referralStages } from '../../server/src/domain';
+export { isPreApplication } from '../../server/src/domain';
 
 export const roleTypeLabels: Record<RoleType, string> = {
   'full-time': 'Full-time',
@@ -15,6 +17,7 @@ export function statusLabel(app: { status: string; interviewRound?: number }) {
 }
 
 export const statuses = [
+  ...referralStages,
   'Applied',
   'Online Assessment',
   'OA Completed',
@@ -25,6 +28,9 @@ export const statuses = [
   'Ghosted',
 ] as const;
 export const statusColors: Record<string, string> = {
+  'Looking for referral': 'bg-slate-100 text-slate-700 ring-slate-200',
+  'Sent referral emails': 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  'Apply now': 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   Applied: 'bg-blue-50 text-blue-700 ring-blue-200',
   'Online Assessment': 'bg-amber-50 text-amber-800 ring-amber-200',
   'OA Completed': 'bg-slate-200 text-slate-800 ring-slate-300',
@@ -41,6 +47,7 @@ export function defaultStatus(category: string) {
     assessment_completed: 'OA Completed',
     interview: 'Interview',
     offer: 'Offer',
+    referral_reply: 'Sent referral emails',
   };
   return mapping[category] || 'Applied';
 }
@@ -52,6 +59,7 @@ export const categoryName = (category: string) =>
     assessment_completed: 'Assessment completed',
     interview: 'Interview invitation',
     offer: 'Job offer',
+    referral_reply: 'Referral reply',
     other: 'Other update',
   })[category] || category;
 export function formatDate(value: string | undefined) {

@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { AI, Email, Store, passesPrefilter, matchesEmail } from './domain.js';
 import { Config } from './config.js';
 import { Tracker, type EmailOutcome } from './service.js';
+import { gmailSendScope, referralMime, type ReferralMail } from './referrals.js';
 
 const EMAIL_TEXT_LIMIT = 6_000;
 const RECHECK_CONCURRENCY = 4;
@@ -99,8 +100,24 @@ export class GmailService {
     const previous = await this.store.getGmail();
     const refreshToken = tokens.refresh_token || previous?.refreshToken;
     if (!refreshToken) throw new Error('No refresh token returned; reconnect with consent');
-    await this.store.saveGmail({ refreshToken });
+    const grantedSend = tokens.scope?.split(/\s+/).includes(gmailSendScope);
+    await this.store.saveGmail({
+      refreshToken,
+      canSend: tokens.refresh_token ? !!grantedSend : !!previous?.canSend && grantedSend !== false,
+    });
     await this.renew();
+  }
+  async sendReferral(message: ReferralMail) {
+    const client = await this.client();
+    const { data } = await client.users.messages.send(
+      {
+        userId: 'me',
+        requestBody: { raw: referralMime(this.config.OWNER_EMAIL, message) },
+      },
+      { retry: false },
+    );
+    if (!data.threadId) throw new Error('Gmail did not return a thread ID');
+    return data.threadId;
   }
   private async processMessage(
     client: gmail_v1.Gmail,
@@ -142,6 +159,44 @@ export class GmailService {
       date: header('date'),
       snippet: text.slice(0, 300),
     };
+    if (message.labelIds?.includes('SENT') && !message.labelIds.includes('INBOX')) {
+      await this.store.markProcessed(id);
+      return skipped;
+    }
+    if (message.threadId) {
+      const sender = (email.from.match(/<([^<>]+)>\s*$/)?.[1] ?? email.from).trim().toLowerCase();
+      const matches = this.store.findReferralApplications
+        ? await this.store.findReferralApplications(message.threadId)
+        : (await this.store.listApplications()).filter((app) =>
+            app.referralSends?.some((send) => send.threadId === message.threadId),
+          );
+      const verified = matches.filter((app) =>
+        app.referralSends?.some(
+          (send) =>
+            send.threadId === message.threadId && send.email === sender && send.state === 'sent',
+        ),
+      );
+      const match =
+        verified.length === 1 ? verified[0] : matches.length === 1 ? matches[0] : undefined;
+      if (match) {
+        if (onTimeline) return skipped;
+        if (sender === this.config.OWNER_EMAIL.toLowerCase()) {
+          await this.store.markProcessed(id);
+          return skipped;
+        }
+        const reply = text.split(/\r?\n(?=\s*>|On .+ wrote:)/i)[0].slice(0, EMAIL_TEXT_LIMIT);
+        const autoSubmitted = header('auto-submitted').toLowerCase();
+        const result =
+          autoSubmitted && autoSubmitted !== 'no'
+            ? 'no_action'
+            : verified.length === 1
+              ? ((await this.ai.classifyReferralReply?.(reply)) ?? 'review')
+              : 'review';
+        const outcome = await this.tracker.receiveReferralReply(email, match.id, result);
+        await this.store.markProcessed(id);
+        return { classified: 1, outcome };
+      }
+    }
     let classified = 0;
     let outcome: EmailOutcome = 'skipped';
     if (onTimeline || passesPrefilter(email.subject + ' ' + text)) {

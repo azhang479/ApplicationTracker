@@ -8,6 +8,7 @@ import { GmailService } from './gmail.js';
 import { logError } from './logging.js';
 import { ResumeService, ResumeError } from './resume-service.js';
 import { TectonicCompiler, CompilationError, type ResumeCompiler } from './resume-compiler.js';
+import { ReferralError, ReferralService, gmailSendScope } from './referrals.js';
 
 const wrap =
   (handler: RequestHandler): RequestHandler =>
@@ -20,6 +21,7 @@ export function createApp(
   gmail: GmailService,
   verifier: TokenVerifier,
   compiler: ResumeCompiler = new TectonicCompiler(),
+  referrals?: ReferralService,
 ) {
   const app = express();
   const resumes = new ResumeService(
@@ -52,12 +54,68 @@ export function createApp(
     auth(config, verifier, 'extension'),
     wrap(async (req, res) => {
       const input = z
-        .object({ url: z.string().url(), pageTitle: z.string().max(2000), text: z.string() })
+        .object({
+          url: z.string().url(),
+          pageTitle: z.string().max(2000),
+          text: z.string(),
+          intent: z.literal('referral').optional(),
+        })
         .parse(req.body);
       res.json(await tracker.capture(input));
     }),
   );
   app.use('/api', auth(config, verifier, 'owner'));
+  function referralService() {
+    if (!referrals)
+      throw new ReferralError(
+        503,
+        'Referral storage is not configured. Redeploy the tracker with the referral résumé bucket.',
+      );
+    return referrals;
+  }
+  app.get(
+    '/api/referrals/settings',
+    wrap(async (_req, res) => {
+      res.json(await referralService().settings());
+    }),
+  );
+  app.put(
+    '/api/referrals/settings',
+    wrap(async (req, res) => {
+      await referralService().saveProfile(req.body);
+      res.sendStatus(204);
+    }),
+  );
+  app.put(
+    '/api/referrals/resume',
+    express.raw({ type: 'application/pdf', limit: '5mb' }),
+    wrap(async (req, res) => {
+      const filename = decodeURIComponent(req.get('X-Resume-Filename') ?? '');
+      res.json(await referralService().upload(filename, req.body));
+    }),
+  );
+  app.get(
+    '/api/applications/:id/referrals',
+    wrap(async (req, res) => {
+      res.json(await referralService().preview(req.params.id));
+    }),
+  );
+  app.post(
+    '/api/applications/:id/referrals/search',
+    wrap(async (req, res) => {
+      const { refresh } = z
+        .object({ refresh: z.boolean().optional() })
+        .strict()
+        .parse(req.body ?? {});
+      res.json(await referralService().search(req.params.id, !!refresh));
+    }),
+  );
+  app.post(
+    '/api/applications/:id/referrals/send',
+    wrap(async (req, res) => {
+      res.json(await referralService().send(req.params.id, req.body));
+    }),
+  );
   app.get(
     '/api/resumes',
     wrap(async (_req, res) => {
@@ -184,7 +242,7 @@ export function createApp(
       res.json(await gmail.recheck(days));
     }),
   );
-  app.post('/api/gmail/connect', (_req, res) => {
+  app.post('/api/gmail/connect', (req, res) => {
     const state = signState(config.OAUTH_CLIENT_SECRET);
     res.cookie('gmail_state', state, {
       httpOnly: true,
@@ -195,7 +253,11 @@ export function createApp(
     });
     res.json({
       url: gmail.oauth().generateAuthUrl({
-        scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+        scope: [
+          'https://www.googleapis.com/auth/gmail.readonly',
+          ...(req.body?.referrals === true ? [gmailSendScope] : []),
+        ],
+        include_granted_scopes: true,
         access_type: 'offline',
         prompt: 'consent',
         state,
@@ -285,7 +347,7 @@ export function createApp(
       res.status(422).json({ error: 'Resume compilation failed', log: error.log });
       return;
     }
-    if (error instanceof ResumeError) {
+    if (error instanceof ResumeError || error instanceof ReferralError) {
       res.status(error.status).json({ error: error.message });
       return;
     }
@@ -293,7 +355,7 @@ export function createApp(
       res.status(413).json({ error: 'Request too large' });
       return;
     }
-    if (error instanceof ZodError || error instanceof SyntaxError) {
+    if (error instanceof ZodError || error instanceof SyntaxError || error instanceof URIError) {
       res.status(400).json({ error: 'Invalid request' });
       return;
     }

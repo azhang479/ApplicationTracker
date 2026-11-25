@@ -1,4 +1,4 @@
-import type { Application, Status } from './types';
+import { isPreApplication, type Application, type Status } from './types';
 
 export const interviewStages = [
   'Interview 1',
@@ -20,6 +20,7 @@ export type FlowApplication = Pick<
 export type AppliedWindow = 0 | 30 | 90;
 
 export function applicationPath(app: FlowApplication): FlowStage[] {
+  if (!app.appliedAt || isPreApplication(app.status)) return [];
   const reached = new Set<Status>([
     ...[...app.events]
       .sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0))
@@ -56,8 +57,11 @@ export function buildFlow(applications: FlowApplication[]) {
   let responded = 0;
   let interviews = 0;
   let offers = 0;
+  let total = 0;
   for (const app of applications) {
     const path = applicationPath(app);
+    if (!path.length) continue;
+    total++;
     for (const stage of path) counts.set(stage, (counts.get(stage) || 0) + 1);
     for (let i = 1; i < path.length; i++) {
       const source = path[i - 1];
@@ -70,14 +74,16 @@ export function buildFlow(applications: FlowApplication[]) {
     if (
       path.includes('Interview 1') ||
       app.status !== 'Applied' ||
-      app.events.some((event) => event.status && event.status !== 'Applied')
+      app.events.some(
+        (event) => event.status && event.status !== 'Applied' && !isPreApplication(event.status),
+      )
     )
       responded++;
     if (path.includes('Interview 1')) interviews++;
     if (path.includes('Offer')) offers++;
   }
   return {
-    total: applications.length,
+    total,
     responded,
     interviews,
     offers,

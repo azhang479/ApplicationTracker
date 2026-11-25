@@ -16,6 +16,7 @@ const schema = z.object({
   PUBSUB_TOPIC: z.string().min(1),
   PUSH_SERVICE_ACCOUNT: z.string().email(),
   GHOSTED_AFTER_DAYS: z.coerce.number().positive().default(45),
+  REFERRAL_RESUME_BUCKET: z.string().min(3).optional(),
   RESUME_FILENAME_PREFIX: z
     .string()
     .min(1)

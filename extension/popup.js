@@ -5,7 +5,8 @@ const JOB_TEXT_LIMIT = 20_000;
 const track = document.getElementById('track');
 const tailor = document.getElementById('tailor');
 const outreach = document.getElementById('outreach');
-const captureButtons = [track, tailor, outreach];
+const referral = document.getElementById('referral');
+const captureButtons = [track, tailor, outreach, referral];
 const message = document.getElementById('message');
 const outreachPreview = document.getElementById('outreach-preview');
 
@@ -53,7 +54,9 @@ async function capture(action = 'track') {
       response = await fetch(config.url + '/api/capture', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': config.apiKey },
-        body: JSON.stringify(injection.result),
+        body: JSON.stringify(
+          action === 'referral' ? { ...injection.result, intent: 'referral' } : injection.result,
+        ),
         signal: AbortSignal.timeout(90000),
       });
     } catch {
@@ -74,6 +77,10 @@ async function capture(action = 'track') {
     document.getElementById('result').hidden = false;
     if (action === 'tailor') {
       await chrome.tabs.create({ url: config.url + '/tailor/' + encodeURIComponent(job.id) });
+    } else if (action === 'referral') {
+      await chrome.tabs.create({
+        url: config.url + '/referrals/' + encodeURIComponent(job.id) + '?find=1',
+      });
     } else if (action === 'outreach') {
       await copyOutreachPrompt(outreachPrompt(job, injection.result.url));
     }
@@ -86,6 +93,7 @@ async function capture(action = 'track') {
 track.addEventListener('click', () => capture());
 tailor.addEventListener('click', () => capture('tailor'));
 outreach.addEventListener('click', () => capture('outreach'));
+referral.addEventListener('click', () => capture('referral'));
 document.getElementById('dashboard').addEventListener('click', async () => {
   try {
     const config = await settings();

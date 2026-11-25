@@ -45,6 +45,14 @@ def fake_gcloud():
         output = '123456789'
     elif starts('projects', 'add-iam-policy-binding'):
         pass
+    elif starts('storage', 'buckets', 'list'):
+        output = state.get('referral_bucket', '')
+    elif starts('storage', 'buckets', 'create'):
+        assert not state.get('referral_bucket'), 'duplicate referral bucket'
+        assert '--public-access-prevention' in args and '--uniform-bucket-level-access' in args
+        state['referral_bucket'] = args[3]
+    elif starts('storage', 'buckets', 'update') or starts('storage', 'buckets', 'add-iam-policy-binding'):
+        assert state['referral_bucket'] == args[3]
     elif starts('firestore', 'databases', 'list'):
         output = 'projects/demo-project/databases/(default)' if state.get('database') else ''
     elif starts('firestore', 'databases', 'create'):
