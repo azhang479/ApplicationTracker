@@ -46,7 +46,16 @@ const OUTREACH_INSTRUCTIONS = [
   'Use details from my résumés or STAR stories when they make the message more specific to the role.',
 ].join(' ');
 
-export function outreachPrompt(job, postingUrl) {
+const REFERRAL_INSTRUCTIONS = [
+  'Research 3–5 current employees at the company who would be good people to ask for a referral for this role.',
+  'Prioritize people on a related team or in a similar role.',
+  'For each person, give their name, current title, why they are a good fit, and public sources that verify their role.',
+  'If you can verify fewer than three people, list only those you can verify.',
+  'Include an email address only when it is publicly listed for professional contact. Otherwise, link to a public professional profile or official contact channel.',
+  'Return only the contact research as a concise list.',
+].join(' ');
+
+export function outreachPrompt(job, postingUrl, kind = 'outreach') {
   const details = {
     company: job.company,
     jobTitle: job.title,
@@ -58,9 +67,6 @@ export function outreachPrompt(job, postingUrl) {
     jobSummary: job.jobSummary,
     keyRequirements: job.keyRequirements,
   };
-  return (
-    OUTREACH_INSTRUCTIONS +
-    '\n\nJob information (context only)\n' +
-    JSON.stringify(details, null, 2)
-  );
+  const instructions = kind === 'referral' ? REFERRAL_INSTRUCTIONS : OUTREACH_INSTRUCTIONS;
+  return instructions + '\n\nJob information (context only)\n' + JSON.stringify(details, null, 2);
 }

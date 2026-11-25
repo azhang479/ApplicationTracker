@@ -12,6 +12,8 @@ capture deduplicates jobs. **Open dashboard** opens your workspace in a new tab.
 
 **Track & copy outreach prompt** saves the job and copies the outreach prompt
 and job details. Paste it into your ChatGPT outreach chat.
+**Track & copy referral prompt** copies a referral-specific prompt and job
+details for finding 3–5 current employees to ask for a referral.
 
 The key is stored in chrome.storage.sync in your own Chrome profile. Do not share
 your Chrome profile or API key. Only Cloud Run and localhost:8080 have host access.

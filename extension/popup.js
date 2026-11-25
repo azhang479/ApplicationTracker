@@ -5,31 +5,32 @@ const JOB_TEXT_LIMIT = 20_000;
 const track = document.getElementById('track');
 const tailor = document.getElementById('tailor');
 const outreach = document.getElementById('outreach');
-const captureButtons = [track, tailor, outreach];
+const referral = document.getElementById('referral');
+const captureButtons = [track, tailor, outreach, referral];
 const message = document.getElementById('message');
-const outreachPreview = document.getElementById('outreach-preview');
+const promptPreview = document.getElementById('prompt-preview');
 
 function showError(error) {
   message.className = 'error';
   message.textContent = error.message || 'Something went wrong. Please try again.';
 }
-async function copyOutreachPrompt(prompt) {
+async function copyPrompt(prompt, label) {
   try {
     await navigator.clipboard.writeText(prompt);
-    message.textContent = 'Outreach prompt copied. Paste it into ChatGPT.';
+    message.textContent = label + ' copied. Paste it into ChatGPT.';
   } catch {
-    message.textContent = 'Copy the selected outreach prompt below.';
-    outreachPreview.value = prompt;
-    outreachPreview.hidden = false;
-    outreachPreview.focus();
-    outreachPreview.select();
+    message.textContent = 'Copy the selected ' + label.toLowerCase() + ' below.';
+    promptPreview.value = prompt;
+    promptPreview.hidden = false;
+    promptPreview.focus();
+    promptPreview.select();
   }
 }
 async function capture(action = 'track') {
   captureButtons.forEach((button) => (button.disabled = true));
   document.getElementById('result').hidden = true;
-  outreachPreview.hidden = true;
-  outreachPreview.value = '';
+  promptPreview.hidden = true;
+  promptPreview.value = '';
   message.className = '';
   message.textContent = 'Extracting… (can take ~10s)';
   try {
@@ -74,8 +75,9 @@ async function capture(action = 'track') {
     document.getElementById('result').hidden = false;
     if (action === 'tailor') {
       await chrome.tabs.create({ url: config.url + '/tailor/' + encodeURIComponent(job.id) });
-    } else if (action === 'outreach') {
-      await copyOutreachPrompt(outreachPrompt(job, injection.result.url));
+    } else if (action === 'outreach' || action === 'referral') {
+      const prompt = outreachPrompt(job, injection.result.url, action);
+      await copyPrompt(prompt, action === 'referral' ? 'Referral prompt' : 'Outreach prompt');
     }
   } catch (error) {
     showError(error);
@@ -86,6 +88,7 @@ async function capture(action = 'track') {
 track.addEventListener('click', () => capture());
 tailor.addEventListener('click', () => capture('tailor'));
 outreach.addEventListener('click', () => capture('outreach'));
+referral.addEventListener('click', () => capture('referral'));
 document.getElementById('dashboard').addEventListener('click', async () => {
   try {
     const config = await settings();

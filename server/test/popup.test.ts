@@ -34,7 +34,8 @@ async function openPopup(
     'track',
     'tailor',
     'outreach',
-    'outreach-preview',
+    'referral',
+    'prompt-preview',
     'message',
     'result',
     'result-label',
@@ -85,6 +86,7 @@ async function openPopup(
   expect(elements.get('track')!.disabled).toBe(false);
   expect(elements.get('tailor')!.disabled).toBe(false);
   expect(elements.get('outreach')!.disabled).toBe(false);
+  expect(elements.get('referral')!.disabled).toBe(false);
   return elements;
 }
 
@@ -101,6 +103,17 @@ const outreachJob = {
   keyRequirements: ['TypeScript', 'SQL'],
   events: [{ snippet: 'Private email content' }],
   tailoring: { reason: 'Private resume details' },
+};
+const expectedJobContext = {
+  company: 'Acme',
+  jobTitle: 'Engineering Intern',
+  postingUrl: 'https://example.com/job',
+  jobReference: 'REQ-123',
+  roleType: 'internship',
+  location: 'Boston',
+  workArrangement: 'hybrid',
+  jobSummary: 'Build internal tooling.',
+  keyRequirements: ['TypeScript', 'SQL'],
 };
 
 describe('extension capture feedback', () => {
@@ -137,45 +150,64 @@ describe('extension capture feedback', () => {
         'Draft a short cold outreach email with a subject line and one clear ask.',
         'Use details from my résumés or STAR stories when they make the message more specific to the role.',
       ].join(' ');
-      const details = {
-        company: 'Acme',
-        jobTitle: 'Engineering Intern',
-        postingUrl: 'https://example.com/job',
-        jobReference: 'REQ-123',
-        roleType: 'internship',
-        location: 'Boston',
-        workArrangement: 'hybrid',
-        jobSummary: 'Build internal tooling.',
-        keyRequirements: ['TypeScript', 'SQL'],
-      };
       expect(writeText).toHaveBeenCalledExactlyOnceWith(
-        instructions + '\n\nJob information (context only)\n' + JSON.stringify(details, null, 2),
+        instructions +
+          '\n\nJob information (context only)\n' +
+          JSON.stringify(expectedJobContext, null, 2),
       );
       expect(globalThis.fetch).toHaveBeenCalledOnce();
       expect(createTab).not.toHaveBeenCalled();
       expect(elements.get('result')!.hidden).toBe(false);
-      expect(elements.get('outreach-preview')!.hidden).toBe(true);
+      expect(elements.get('prompt-preview')!.hidden).toBe(true);
       expect(elements.get('message')!.textContent).toContain('Outreach prompt copied.');
     },
   );
-  it('offers selected prompt text if clipboard writing fails after the job is saved', async () => {
-    const elements = await openPopup(
-      { status: 200, ok: true, json: async () => outreachJob },
-      'Page',
-      'outreach',
-      new Error('Clipboard blocked'),
-    );
-    const preview = elements.get('outreach-preview')!;
-    expect(preview.hidden).toBe(false);
-    expect(preview.value).toBe(writeText.mock.calls[0][0]);
-    expect(preview.select).toHaveBeenCalledOnce();
-    expect(elements.get('result')!.hidden).toBe(false);
-    expect(elements.get('message')!.textContent).toBe('Copy the selected outreach prompt below.');
-  });
-  it('copies nothing when tracking fails', async () => {
-    const elements = await openPopup({ status: 503, ok: false }, 'Page', 'outreach');
+  it.each([false, true])(
+    'copies referral instructions and job fields after capture, duplicate=%s',
+    async (duplicate) => {
+      const elements = await openPopup(
+        { status: 200, ok: true, json: async () => ({ ...outreachJob, duplicate }) },
+        'Page',
+        'referral',
+      );
+      const [instructions, context] = writeText.mock.calls[0][0].split(
+        '\n\nJob information (context only)\n',
+      );
+      expect(instructions).toContain('3–5 current employees');
+      expect(instructions).toContain('public sources that verify their role');
+      expect(instructions).toContain('publicly listed for professional contact');
+      expect(instructions).toContain('Return only the contact research');
+      expect(instructions).not.toMatch(/draft|subject line/i);
+      expect(JSON.parse(context)).toEqual(expectedJobContext);
+      expect(writeText).toHaveBeenCalledOnce();
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+      expect(createTab).not.toHaveBeenCalled();
+      expect(elements.get('result')!.hidden).toBe(false);
+      expect(elements.get('prompt-preview')!.hidden).toBe(true);
+      expect(elements.get('message')!.textContent).toContain('Referral prompt copied.');
+    },
+  );
+  it.each(['outreach', 'referral'])(
+    'offers selected %s prompt text if clipboard writing fails after the job is saved',
+    async (mode) => {
+      const elements = await openPopup(
+        { status: 200, ok: true, json: async () => outreachJob },
+        'Page',
+        mode,
+        new Error('Clipboard blocked'),
+      );
+      const preview = elements.get('prompt-preview')!;
+      expect(preview.hidden).toBe(false);
+      expect(preview.value).toBe(writeText.mock.calls[0][0]);
+      expect(preview.select).toHaveBeenCalledOnce();
+      expect(elements.get('result')!.hidden).toBe(false);
+      expect(elements.get('message')!.textContent).toBe(`Copy the selected ${mode} prompt below.`);
+    },
+  );
+  it.each(['outreach', 'referral'])('copies no %s prompt when tracking fails', async (mode) => {
+    const elements = await openPopup({ status: 503, ok: false }, 'Page', mode);
     expect(writeText).not.toHaveBeenCalled();
-    expect(elements.get('outreach-preview')!.hidden).toBe(true);
+    expect(elements.get('prompt-preview')!.hidden).toBe(true);
   });
   it.each([0, 19999, 20000, 20001, 40000])(
     'caps a %s-character page before sending it',

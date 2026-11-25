@@ -14,6 +14,7 @@
       <button id="track">Track this job ↗</button
       ><button id="tailor">Track &amp; tailor resume</button
       ><button id="outreach">Track &amp; copy outreach prompt</button
+      ><button id="referral">Track &amp; copy referral prompt</button
       ><button id="dashboard" class="secondary">Open dashboard</button>
     </div>
     <p id="message" role="status" aria-live="polite"></p>
@@ -23,13 +24,7 @@
       <p id="title"></p>
       <p id="salary"></p>
     </section>
-    <textarea
-      id="outreach-preview"
-      aria-label="Outreach prompt"
-      rows="7"
-      readonly
-      hidden
-    ></textarea>
+    <textarea id="prompt-preview" aria-label="Prompt to copy" rows="7" readonly hidden></textarea>
     <footer><span>One step at a time.</span><a href="#" id="settings">Settings</a></footer>
     <script type="module" src="popup.js"></script>
   </body>
