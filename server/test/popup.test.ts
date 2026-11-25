@@ -34,6 +34,7 @@ async function openPopup(
     'track',
     'tailor',
     'outreach',
+    'referral',
     'outreach-preview',
     'message',
     'result',
@@ -122,6 +123,19 @@ describe('extension capture feedback', () => {
   it('does not navigate when tailoring capture fails', async () => {
     await openPopup({ status: 401, ok: false }, 'Page', 'tailor');
     expect(createTab).not.toHaveBeenCalled();
+  });
+  it('tracks a referral before application and opens recipient review', async () => {
+    await openPopup(
+      { status: 200, ok: true, json: async () => ({ id: 'existing/id', company: 'Acme' }) },
+      'Page',
+      'referral',
+    );
+    expect(JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1]!.body as string).intent).toBe(
+      'referral',
+    );
+    expect(createTab).toHaveBeenCalledWith({
+      url: 'http://localhost:8080/referrals/existing%2Fid?find=1',
+    });
   });
   it.each([false, true])(
     'copies the fixed outreach prompt and job fields after capture, duplicate=%s',

@@ -6,6 +6,7 @@ import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
 import type { GmailService } from '../src/gmail.js';
 import type { Tracker } from '../src/service.js';
+import type { ReferralService } from '../src/referrals.js';
 
 const config = {
   OWNER_EMAIL: 'owner@gmail.com',
@@ -24,12 +25,16 @@ let server: Server;
 const capture = vi.fn();
 const processNotification = vi.fn();
 const recheck = vi.fn();
+const uploadReferralResume = vi.fn();
+const sendReferral = vi.fn();
 let log: ReturnType<typeof vi.spyOn>;
 let base: string;
 beforeEach(async () => {
   capture.mockReset();
   processNotification.mockReset();
   recheck.mockReset();
+  uploadReferralResume.mockReset();
+  sendReferral.mockReset();
   log = vi.spyOn(console, 'error').mockImplementation(() => {});
   const app = createApp(
     config,
@@ -42,6 +47,8 @@ beforeEach(async () => {
         iss: 'accounts.google.com',
       }),
     },
+    undefined,
+    { upload: uploadReferralResume, send: sendReferral } as unknown as ReferralService,
   );
   server = await new Promise<Server>((resolve) => {
     const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
@@ -68,6 +75,28 @@ async function post(body: unknown, path = '/api/capture') {
 function logged() {
   return JSON.parse(log.mock.calls[0][0] as string);
 }
+describe('referral endpoints', () => {
+  it('requires owner authentication for sending even with an extension key', async () => {
+    const response = await post({}, '/api/applications/job/referrals/send');
+    expect(response.status).toBe(403);
+    expect(sendReferral).not.toHaveBeenCalled();
+  });
+  it('passes the original PDF bytes and filename to the owner-only upload', async () => {
+    const bytes = Buffer.from('%PDF-1.7\u0000\xff', 'latin1');
+    uploadReferralResume.mockResolvedValue({ filename: 'My Resume.pdf', revision: '2' });
+    const response = await fetch(base + '/api/referrals/resume', {
+      method: 'PUT',
+      headers: {
+        Authorization: 'Bearer owner-token',
+        'Content-Type': 'application/pdf',
+        'X-Resume-Filename': 'My%20Resume.pdf',
+      },
+      body: bytes,
+    });
+    expect(response.status).toBe(200);
+    expect(uploadReferralResume).toHaveBeenCalledWith('My Resume.pdf', bytes);
+  });
+});
 describe('authenticated Gmail recheck endpoint', () => {
   async function request(body: unknown, token = 'owner-token') {
     return fetch(base + '/api/gmail/recheck', {

@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { JobFields } from './JobFields';
 import { AssessmentEmailLink } from './AssessmentEmailLink';
-import { Application, Job, Status, statuses, formatDate, statusLabel, statusColors } from './types';
+import {
+  Application,
+  Job,
+  Status,
+  statuses,
+  formatDate,
+  statusLabel,
+  statusColors,
+  isPreApplication,
+} from './types';
 
 export function Drawer({
   app,
@@ -9,6 +18,7 @@ export function Drawer({
   save,
   remove,
   removeEvent,
+  markApplied,
 }: {
   app: Application;
   close: () => void;
@@ -17,11 +27,12 @@ export function Drawer({
     fields: Job & {
       status: Status;
       interviewRound?: number;
-      appliedAt: string;
+      appliedAt?: string;
       lastActivityAt: string;
     },
   ) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  markApplied: () => Promise<void>;
   removeEvent: (
     id: string,
     index: number,
@@ -48,6 +59,7 @@ export function Drawer({
   const [status, setStatus] = useState(app.status);
   const [round, setRound] = useState(app.interviewRound ?? 1);
   const localDate = (value: string) => {
+    if (!value) return '';
     const date = new Date(value);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   };
@@ -105,7 +117,7 @@ export function Drawer({
               keyRequirements: job.keyRequirements.filter(Boolean),
               status,
               ...(status === 'Interview' ? { interviewRound: round } : {}),
-              appliedAt: new Date(applied).toISOString(),
+              ...(applied ? { appliedAt: new Date(applied).toISOString() } : {}),
               lastActivityAt: new Date(activity).toISOString(),
             }),
           );
@@ -142,6 +154,29 @@ export function Drawer({
             {app.tailoring && (
               <span className="text-xs text-slate-500">Tailored · {app.tailoring.resumeLabel}</span>
             )}
+            {isPreApplication(app.status) && (
+              <>
+                <a
+                  className="secondary-button inline-block"
+                  href={'/referrals/' + encodeURIComponent(app.id)}
+                >
+                  Email referrers ↗
+                </a>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void action(markApplied)}
+                >
+                  Mark as applied
+                </button>
+              </>
+            )}
+            {app.status === 'Apply now' && (
+              <a className="link" href={app.url} target="_blank" rel="noreferrer">
+                Open posting ↗
+              </a>
+            )}
           </div>
           <label>
             Application status
@@ -173,7 +208,6 @@ export function Drawer({
             <label>
               Date applied
               <input
-                required
                 type="datetime-local"
                 value={applied}
                 onChange={(e) => setApplied(e.target.value)}

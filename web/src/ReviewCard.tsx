@@ -23,7 +23,12 @@ export function ReviewCard({
   const id = useId();
   const { bestMatches, others } = reviewApplications(applications, item.candidates);
   const [applicationId, setApplicationId] = useState(bestMatches[0]?.id || '');
-  const [status, setStatus] = useState<Status>(defaultStatus(item.classification.category));
+  const [status, setStatus] = useState<Status>(
+    item.classification.category === 'referral_reply'
+      ? (applications.find((app) => app.id === bestMatches[0]?.id)?.status ??
+          'Sent referral emails')
+      : defaultStatus(item.classification.category),
+  );
   const selectedApplicationId = applications.some((app) => app.id === applicationId)
     ? applicationId
     : '';

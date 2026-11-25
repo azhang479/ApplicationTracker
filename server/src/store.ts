@@ -2,6 +2,7 @@ import { Firestore, Transaction, type QueryDocumentSnapshot } from '@google-clou
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Application, GmailConfig, Review, Store } from './domain.js';
 import type { Resume } from './resume-domain.js';
+import type { ReferralProfile } from './referrals.js';
 
 type Context = {
   apps: Map<string, Application>;
@@ -39,6 +40,13 @@ export class FirestoreStore implements Store {
     const ctx = this.context.getStore();
     if (ctx) return [...ctx.apps.values()];
     return (await this.db.collection('applications').get()).docs.map(applicationFromDocument);
+  }
+  async findReferralApplications(threadId: string) {
+    const matches = await this.db
+      .collection('applications')
+      .where('referralThreadIds', 'array-contains', threadId)
+      .get();
+    return matches.docs.map(applicationFromDocument);
   }
   async listResumes() {
     const ctx = this.context.getStore();
@@ -115,6 +123,12 @@ export class FirestoreStore implements Store {
   }
   async getGmail() {
     return (await this.db.doc('config/gmail').get()).data() as GmailConfig | undefined;
+  }
+  async getReferralProfile() {
+    return (await this.db.doc('config/referrals').get()).data() as ReferralProfile | undefined;
+  }
+  async saveReferralProfile(profile: ReferralProfile) {
+    await this.db.doc('config/referrals').set(profile);
   }
   async saveGmail(config: GmailConfig) {
     const ref = this.db.doc('config/gmail');

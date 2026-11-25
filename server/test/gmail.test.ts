@@ -29,6 +29,8 @@ function setup(
   } as unknown as Store;
   const classify = vi.fn().mockResolvedValue({ isJobRelated: false });
   const receive = vi.fn();
+  const classifyReferralReply = vi.fn().mockResolvedValue('ready');
+  const receiveReferralReply = vi.fn().mockResolvedValue('updated');
   const service = new GmailService(
     {
       OWNER_EMAIL: ownerEmail,
@@ -37,13 +39,74 @@ function setup(
       PUBLIC_URL: 'https://example.test',
     } as Config,
     store,
-    { classify } as unknown as AI,
-    { receive } as unknown as Tracker,
+    { classify, classifyReferralReply } as unknown as AI,
+    { receive, receiveReferralReply } as unknown as Tracker,
   );
-  return { service, history, list, get, store, classify, receive, saveGmail, saved: () => saved };
+  return {
+    service,
+    history,
+    list,
+    get,
+    store,
+    classify,
+    receive,
+    classifyReferralReply,
+    receiveReferralReply,
+    saveGmail,
+    saved: () => saved,
+  };
 }
 const notification = { emailAddress: 'owner@gmail.com', historyId: '200' };
 beforeEach(() => vi.clearAllMocks());
+describe('Gmail referral replies', () => {
+  it.each([
+    ['Referrer <referrer@example.com>', 'ready'],
+    ['Another employee <other@example.com>', 'review'],
+  ])(
+    'correlates replies by thread and checks the sender before advancing %s',
+    async (from, decision) => {
+      const ctx = setup();
+      vi.mocked(ctx.store.isProcessed).mockResolvedValue(false);
+      ctx.store.findReferralApplications = vi.fn().mockResolvedValue([
+        {
+          id: 'job',
+          referralSends: [{ threadId: 'thread', state: 'sent', email: 'referrer@example.com' }],
+        },
+      ]);
+      ctx.history.mockResolvedValue({
+        data: {
+          historyId: '200',
+          history: [{ messagesAdded: [{ message: { id: 'reply' } }] }],
+        },
+      });
+      ctx.get.mockResolvedValue({
+        data: {
+          threadId: 'thread',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'text/plain',
+            body: {
+              data: Buffer.from('Go ahead and apply.\r\n> Quoted original message').toString(
+                'base64url',
+              ),
+            },
+            headers: [{ name: 'From', value: from }],
+          },
+        },
+      });
+      await ctx.service.processNotification(notification);
+      expect(ctx.receiveReferralReply).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'reply' }),
+        'job',
+        decision,
+      );
+      expect(ctx.classify).not.toHaveBeenCalled();
+      if (decision === 'ready')
+        expect(ctx.classifyReferralReply).toHaveBeenCalledWith('Go ahead and apply.');
+      else expect(ctx.classifyReferralReply).not.toHaveBeenCalled();
+    },
+  );
+});
 describe('Gmail sync cursor', () => {
   it('records lastSyncAt even for an empty successful notification', async () => {
     const ctx = setup();

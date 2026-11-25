@@ -8,6 +8,7 @@ import { Resumes } from './Resumes';
 import { Tailor } from './Tailor';
 import { Insights } from './Insights';
 import { RoleTypeFilter, type RoleTypeSelection } from './RoleTypeFilter';
+import { ReferralSettings, Referrals } from './Referrals';
 import { sortApplications, defaultSortDirection, type SortKey, type SortDirection } from './sort';
 import {
   Application,
@@ -21,6 +22,7 @@ import {
   roleTypeOf,
   salary,
   formatDate,
+  isPreApplication,
 } from './types';
 
 type GmailStatus = { connected: boolean; watchExpiration: string | null };
@@ -65,11 +67,20 @@ export function App() {
     window.google?.accounts.id.disableAutoSelect();
   }, []);
   const api = useCallback(
-    async <T,>(path: string, method = 'GET', body?: unknown): Promise<T> => {
+    async <T,>(
+      path: string,
+      method = 'GET',
+      body?: unknown,
+      headers?: Record<string, string>,
+    ): Promise<T> => {
       const response = await fetch(path, {
         method,
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': body instanceof Blob ? 'application/pdf' : 'application/json',
+          ...headers,
+        },
+        body: body instanceof Blob ? body : body === undefined ? undefined : JSON.stringify(body),
       });
       if (response.status === 401) {
         signOut();
@@ -99,7 +110,12 @@ export function App() {
     setGmail(status);
   }, [api]);
   useEffect(() => {
-    if (!token || location.pathname.startsWith('/tailor/')) return;
+    if (
+      !token ||
+      location.pathname.startsWith('/tailor/') ||
+      location.pathname.startsWith('/referrals/')
+    )
+      return;
     let active = true;
     setLoading(true);
     setError('');
@@ -119,7 +135,7 @@ export function App() {
     fields: Job & {
       status: Status;
       interviewRound?: number;
-      appliedAt: string;
+      appliedAt?: string;
       lastActivityAt: string;
     },
   ) {
@@ -156,6 +172,8 @@ export function App() {
     return (
       <Tailor id={decodeURIComponent(tailorPath[1])} api={api} token={token} signOut={signOut} />
     );
+  const referralPath = location.pathname.match(/^\/referrals\/([^/]+)\/?$/);
+  if (referralPath) return <Referrals id={decodeURIComponent(referralPath[1])} api={api} />;
   const visible = sortApplications(
     roleApps.filter(
       (app) =>
@@ -166,7 +184,10 @@ export function App() {
     sortDirection,
   );
   const active = apps.filter(
-    (a) => !['Rejected', 'Withdrawn', 'Ghosted'].includes(a.status),
+    (a) =>
+      a.appliedAt &&
+      !isPreApplication(a.status) &&
+      !['Rejected', 'Withdrawn', 'Ghosted'].includes(a.status),
   ).length;
   return (
     <div className="min-h-screen">
@@ -218,7 +239,11 @@ export function App() {
         </div>
         <div className="workspace-stats grid sm:grid-cols-3 gap-4 mb-9">
           {[
-            ['Applications tracked', apps.length, 'Every opportunity, organized.'],
+            [
+              'Applications tracked',
+              apps.filter((app) => app.appliedAt && !isPreApplication(app.status)).length,
+              'Every opportunity, organized.',
+            ],
             ['Active applications', active, 'Good things are in the works.'],
             ['Waiting for your review', reviews.length, 'A quick check keeps things on track.'],
           ].map(([label, count, note]) => (
@@ -522,7 +547,8 @@ export function App() {
                     : 'Connect Gmail'}
               </button>
               <p className="text-xs text-slate-400 mt-5 leading-relaxed">
-                Read-only access. We never send email or store full email bodies.
+                Gmail tracks replies and application updates. Enable referral sending separately in
+                Job referrals.
                 <br />
                 The connection is renewed automatically each day.
               </p>
@@ -535,6 +561,14 @@ export function App() {
                 }}
               />
             </section>
+            <ReferralSettings
+              api={api}
+              upload={(file) =>
+                api('/api/referrals/resume', 'PUT', file, {
+                  'X-Resume-Filename': encodeURIComponent(file.name),
+                })
+              }
+            />
             <Resumes api={api} />
           </>
         )}
@@ -551,6 +585,12 @@ export function App() {
           save={save}
           remove={remove}
           removeEvent={removeEvent}
+          markApplied={async () => {
+            await api('/api/applications/' + encodeURIComponent(selected.id), 'PATCH', {
+              status: 'Applied',
+            });
+            await refresh();
+          }}
         />
       )}
     </div>

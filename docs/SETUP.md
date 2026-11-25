@@ -134,8 +134,8 @@ may call this **APIs & Services → OAuth consent screen** in the older layout.
    address under **Test users**.
 3. Under **Data Access → Add or remove scopes**, add
    `https://www.googleapis.com/auth/gmail.readonly`. If you see basic identity
-   scopes (`openid`, email, profile), keep them for Google sign-in too. The app only
-   requests read access to Gmail: it cannot send, delete, or change emails.
+   scopes (`openid`, email, profile), keep them for Google sign-in too. This is the
+   scope for reading application updates. Job referrals has a separate send permission.
 4. Under **Audience**, choose **Publish app → In production** and confirm. Older
    layouts put this button on the consent-screen page.
 
@@ -246,6 +246,22 @@ Click a row to edit its job fields, status, or dates and see its email timeline.
 System IDs, creation/update timestamps, and timeline entries are read-only.
 **Needs review** lets you apply uncertain mail to a suggested application, create
 a new one, or dismiss it.
+
+### Job referrals
+
+Redeploy with `infra/setup.sh` to create the private résumé bucket and configure
+the tracker to access it. In Google Auth Platform → Data Access, add
+`https://www.googleapis.com/auth/gmail.send` alongside the existing read scope.
+
+Open **Settings → Job referrals** to save your name and introduction, upload
+the default résumé PDF, and select **Enable Gmail sending**. In Chrome, reload
+the unpacked extension and use **Track & email referrers** on a job posting.
+
+Review the employee and email sources, check the selected messages and résumé
+filename, then click **Send selected**. Successful sends appear in the job’s
+timeline. If delivery is uncertain, check Gmail before contacting that person
+again. A clear referral reply moves the job to **Apply now**. A matching
+application confirmation or **Mark as applied** starts application tracking.
 
 ## 7. View your data in Firestore
 

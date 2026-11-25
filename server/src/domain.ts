@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import type { Resume, Tailoring, TailorOutput } from './resume-domain.js';
 
+export const referralStages = [
+  'Looking for referral',
+  'Sent referral emails',
+  'Apply now',
+] as const;
 export const statuses = [
+  ...referralStages,
   'Applied',
   'Online Assessment',
   'OA Completed',
@@ -40,6 +46,7 @@ export const classificationSchema = z.object({
     'assessment_completed',
     'interview',
     'offer',
+    'referral_reply',
     'other',
   ]),
   company: z.string(),
@@ -50,6 +57,21 @@ export const classificationSchema = z.object({
 export type Job = z.infer<typeof jobSchema>;
 export type Classification = z.infer<typeof classificationSchema>;
 export type Status = (typeof statuses)[number];
+export function isPreApplication(status: Status) {
+  return referralStages.some((stage) => stage === status);
+}
+export type ReferralContact = {
+  name: string;
+  title: string;
+  source: string;
+  email?: string;
+  emailSource?: string;
+};
+export type ReferralSend = {
+  email: string;
+  state: 'sending' | 'sent' | 'failed' | 'unknown';
+  threadId?: string;
+};
 export type Event = {
   interviewRound?: number;
   at: string;
@@ -71,6 +93,9 @@ export type Application = Job & {
   updatedAt: string;
   events: Event[];
   tailoring?: Tailoring;
+  referralContacts?: ReferralContact[];
+  referralSends?: ReferralSend[];
+  referralThreadIds?: string[];
 };
 export type Email = {
   id: string;
@@ -104,6 +129,7 @@ export type GmailConfig = {
   refreshToken: string;
   historyId?: string;
   watchExpiration?: string;
+  canSend?: boolean;
   lastSyncAt?: string;
 };
 export interface Store {
@@ -111,6 +137,7 @@ export interface Store {
   saveResume(resume: Resume): Promise<void>;
   deleteResume(id: string): Promise<void>;
   listApplications(): Promise<Application[]>;
+  findReferralApplications?(threadId: string): Promise<Application[]>;
   saveApplication(app: Application): Promise<void>;
   deleteApplication(id: string): Promise<void>;
   listReview(): Promise<Review[]>;
@@ -128,6 +155,10 @@ export interface AI {
   }): Promise<TailorOutput>;
   extract(input: { url: string; pageTitle: string; text: string }): Promise<Job>;
   classify(text: string): Promise<Classification>;
+  findReferrers?(
+    job: Pick<Job, 'company' | 'title' | 'location' | 'url'>,
+  ): Promise<ReferralContact[]>;
+  classifyReferralReply?(text: string): Promise<'ready' | 'review' | 'no_action'>;
 }
 const companyAliases: Record<string, string> = {
   jpmorgan: 'jpmorganchase',
@@ -217,6 +248,7 @@ export function categoryStatus(category: Classification['category']): Status | u
   return mapping[category];
 }
 export function emailStatus(current: Status, category: Classification['category']): Status {
+  if (isPreApplication(current)) return category === 'confirmation' ? 'Applied' : current;
   const next = categoryStatus(category);
   if (current === 'Rejected' || current === 'Withdrawn') return current;
   if (next === 'Rejected') return next;

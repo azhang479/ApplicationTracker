@@ -37,6 +37,49 @@ const fields = {
   keyRequirements: ['TypeScript'],
 };
 const ai = new VertexAI('test-project', 'global', 'test-model');
+describe('Gemini referral research', () => {
+  it('requires a role source and limits sendable addresses to grounded claims', async () => {
+    generate.mockResolvedValue({
+      text: JSON.stringify([
+        { name: 'Alex Chen', title: 'Engineer', email: 'alex@example.com' },
+        { name: 'Casey Smith', title: 'Engineer', email: 'casey@example.com' },
+        { name: 'Unverified', title: 'Engineer' },
+      ]),
+      candidates: [
+        {
+          groundingMetadata: {
+            groundingChunks: [{ web: { uri: 'https://example.com/team' } }],
+            groundingSupports: [
+              {
+                segment: { text: 'Alex Chen, Engineer, alex@example.com' },
+                groundingChunkIndices: [0],
+              },
+              { segment: { text: 'Casey Smith, Engineer' }, groundingChunkIndices: [0] },
+            ],
+          },
+        },
+      ],
+    });
+    expect(
+      await ai.findReferrers({
+        company: 'Example',
+        title: 'Engineer',
+        location: '',
+        url: input.url,
+      }),
+    ).toEqual([
+      {
+        name: 'Alex Chen',
+        title: 'Engineer',
+        source: 'https://example.com/team',
+        email: 'alex@example.com',
+        emailSource: 'https://example.com/team',
+      },
+      { name: 'Casey Smith', title: 'Engineer', source: 'https://example.com/team' },
+    ]);
+    expect(generate.mock.calls[0][0].config.tools).toEqual([{ googleSearch: {} }]);
+  });
+});
 describe('Gemini resume tailoring', () => {
   const input = {
     job: {

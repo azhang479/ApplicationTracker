@@ -13,5 +13,9 @@ capture deduplicates jobs. **Open dashboard** opens your workspace in a new tab.
 **Track & copy outreach prompt** saves the job and copies the outreach prompt
 and job details. Paste it into your ChatGPT outreach chat.
 
+**Track & email referrers** saves a new posting before application and opens
+recipient review in the dashboard. Configure your résumé and Gmail sending
+under **Settings → Job referrals**, then choose the recipients to send to.
+
 The key is stored in chrome.storage.sync in your own Chrome profile. Do not share
 your Chrome profile or API key. Only Cloud Run and localhost:8080 have host access.
