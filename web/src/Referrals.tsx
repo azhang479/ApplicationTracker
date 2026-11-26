@@ -198,6 +198,14 @@ export function Referrals({ id, api }: { id: string; api: Api }) {
   }
   const inReferral = !!view && isPreApplication(view.app.status);
   const ready = !!view?.resume && view.hasProfile && view.canSend && inReferral;
+  const searchTitle = view?.app.title.replace(
+    /^(?:associate|junior|senior|staff|principal)[,\s]+/i,
+    '',
+  );
+  const profileSearch =
+    view &&
+    'https://www.google.com/search?' +
+      new URLSearchParams({ q: `site:linkedin.com/in/ ${view.app.company} ${searchTitle}` });
   return (
     <main className="max-w-4xl mx-auto px-5 md:px-8 py-8">
       <a className="link text-sm" href="/">
@@ -252,10 +260,20 @@ export function Referrals({ id, api }: { id: string; api: Api }) {
           {view.resume && (
             <p className="text-sm text-slate-500 mt-4">Attachment · {view.resume.filename}</p>
           )}
-          {!busy && view.app.referralContacts && !view.contacts.length && (
+          {!busy && !error && view.app.referralContacts && !view.contacts.length && (
             <p className="text-sm text-slate-500 mt-4">
-              The search found no contacts with usable sources.
+              Gemini couldn’t find contacts it could cite.
             </p>
+          )}
+          {inReferral && !busy && !view.contacts.length && (view.app.referralContacts || error) && (
+            <a
+              className="link text-sm inline-block mt-2"
+              href={profileSearch}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Search public profiles ↗
+            </a>
           )}
           <div className="space-y-4 mt-5">
             {view.contacts.map((contact) => {
