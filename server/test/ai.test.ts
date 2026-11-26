@@ -110,23 +110,43 @@ describe('Gemini referral research', () => {
     await expect(ai.findReferrers(job)).rejects.toThrow('could not read the contact list');
   });
 
+  it('reports candidate names without source links as a retryable error', async () => {
+    generate.mockResolvedValue({
+      text: '- Alex Chen is an Engineer at Example.',
+      candidates: [{ groundingMetadata: { webSearchQueries: ['Example engineers'] } }],
+    });
+    await expect(ai.findReferrers(job)).rejects.toThrow('contacts without usable source links');
+  });
+
+  it('accepts an explicit empty search result', async () => {
+    generate.mockResolvedValue({ text: 'No contacts found.' });
+    await expect(ai.findReferrers(job)).resolves.toEqual([]);
+  });
+
   it('requires a role source and limits sendable addresses to grounded claims', async () => {
     generate.mockResolvedValue({
-      text: JSON.stringify([
-        { name: 'Alex Chen', title: 'Engineer', email: 'alex@example.com' },
-        { name: 'Casey Smith', title: 'Engineer', email: 'casey@example.com' },
-        { name: 'Unverified', title: 'Engineer' },
-      ]),
+      text: [
+        '- Alex Chen is an Engineer at Example. Public work email: alex@example.com.',
+        '- **Casey Smith** is the Lead Engineer at Example. Public work email: casey@example.com.',
+        '- Undocumented Person is an Engineer at Example.',
+      ].join('\n'),
       candidates: [
         {
           groundingMetadata: {
             groundingChunks: [{ web: { uri: 'https://example.com/team' } }],
             groundingSupports: [
               {
-                segment: { text: 'Alex Chen, Engineer, alex@example.com' },
+                segment: { text: 'Alex Chen is an Engineer at Example' },
                 groundingChunkIndices: [0],
               },
-              { segment: { text: 'Casey Smith, Engineer' }, groundingChunkIndices: [0] },
+              {
+                segment: { text: 'Public work email: alex@example.com' },
+                groundingChunkIndices: [0],
+              },
+              {
+                segment: { text: 'Casey Smith is the Lead Engineer at Example' },
+                groundingChunkIndices: [0],
+              },
             ],
           },
         },
@@ -147,9 +167,10 @@ describe('Gemini referral research', () => {
         email: 'alex@example.com',
         emailSource: 'https://example.com/team',
       },
-      { name: 'Casey Smith', title: 'Engineer', source: 'https://example.com/team' },
+      { name: 'Casey Smith', title: 'Lead Engineer', source: 'https://example.com/team' },
     ]);
     expect(generate.mock.calls[0][0].config.tools).toEqual([{ googleSearch: {} }]);
+    expect(generate.mock.calls[0][0].config.systemInstruction).toContain('one Markdown bullet');
   });
 });
 describe('Gemini resume tailoring', () => {
