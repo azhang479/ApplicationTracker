@@ -202,10 +202,10 @@ export function Referrals({ id, api }: { id: string; api: Api }) {
     /^(?:associate|junior|senior|staff|principal)[,\s]+/i,
     '',
   );
-  const profileSearch =
+  const linkedinSearch =
     view &&
-    'https://www.google.com/search?' +
-      new URLSearchParams({ q: `site:linkedin.com/in/ ${view.app.company} ${searchTitle}` });
+    'https://www.linkedin.com/search/results/people/?' +
+      new URLSearchParams({ keywords: `${view.app.company} ${searchTitle}` });
   return (
     <main className="max-w-4xl mx-auto px-5 md:px-8 py-8">
       <a className="link text-sm" href="/">
@@ -234,13 +234,18 @@ export function Referrals({ id, api }: { id: string; api: Api }) {
               {view.app.status}
             </span>
             {inReferral && (
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => void update('/search', { refresh: true })}
-              >
-                {view.app.referralContacts ? 'Search again' : 'Find referrers'}
-              </button>
+              <>
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void update('/search', { refresh: true })}
+                >
+                  {view.app.referralContacts ? 'Search again' : 'Find referrers'}
+                </button>
+                <a className="link text-sm" href={linkedinSearch} target="_blank" rel="noreferrer">
+                  Search LinkedIn ↗
+                </a>
+              </>
             )}
             {view.app.status === 'Apply now' && (
               <a className="link" href={view.app.url} target="_blank" rel="noreferrer">
@@ -264,16 +269,6 @@ export function Referrals({ id, api }: { id: string; api: Api }) {
             <p className="text-sm text-slate-500 mt-4">
               Gemini couldn’t find contacts it could cite.
             </p>
-          )}
-          {inReferral && !busy && !view.contacts.length && (view.app.referralContacts || error) && (
-            <a
-              className="link text-sm inline-block mt-2"
-              href={profileSearch}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Search public profiles ↗
-            </a>
           )}
           <div className="space-y-4 mt-5">
             {view.contacts.map((contact) => {
